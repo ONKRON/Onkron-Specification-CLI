@@ -10,19 +10,33 @@ const connection = mysql.createConnection({
 connection.connect((err) => {
     if (err) throw err;
     console.log('Успешное подключение к БД!');
-    let sql = 'SELECT * FROM products_specifications';
+    let sql = 'SELECT * FROM products_specifications WHERE language_id = 1 AND specifications_id = ';
     connection.query(sql, (err, results) => {
       if (err) throw err;
       results.forEach((row)=> {
-        if (row.specifications_id == 60) {
-        
-          // чтобы получить единицу в дюймах 
-          let newSpecification = (parseFloat(row.specification * 0.04).toFixed(2)).toString();
-           
-          newSpecification = Math.round(newSpecification * 100) / 100;
-        if (newSpecification % 1 === 0) {
-          newSpecification = Math.round(newSpecification);
-        }
+        if (row.specifications_id == 61) {
+          if (row.specification == 'Холоднокатаная сталь') {
+            row.specification = 'SPCC cold rolled steel'
+          } else if (row.specification == 'Нержавеющая сталь') {
+            row.specification = 'Stainless steel'
+          }
+          else if (row.specification == 'Алюминий') {
+            row.specification = 'Aluminum'
+          }
+          else if (row.specification == 'Пластик') {
+            row.specification = 'Plastic'
+          }
+          else if (row.specification == 'Бук') {
+            row.specification = 'Beech'
+          }
+          else if (row.specification == 'Резина') {
+            row.specification = 'Rubber'
+          }
+          else if (row.specification == 'Стекло') {
+            row.specification = 'Glass'
+          } 
+          
+       let newSpecification = row.specification
           let productId = row.products_id;
           row.language_id = 2
           row.specification = newSpecification

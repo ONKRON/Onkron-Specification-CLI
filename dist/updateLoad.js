@@ -3,44 +3,28 @@ const mysql = require("mysql2");
 const connection = mysql.createConnection({
   host: "shop.onkron.ru",
   user: "shop_o",
-  database: "shop_new",
+  database: "shop_onkron_ru",
   password: "8dYNH846SPvY",
 });
 
 connection.connect((err) => {
     if (err) throw err;
     console.log('Успешное подключение к БД!');
-    let sql = 'SELECT * FROM products_specifications';
+    let sql = 'SELECT * FROM products_specifications WHERE language_id = 1 AND specifications_id = 786';
     connection.query(sql, (err, results) => {
       if (err) throw err;
       results.forEach((row)=> {
-        if (row.specifications_id == 61) {
-          if (row.specification == 'Холоднокатаная сталь') {
-            row.specification = 'SPCC cold rolled steel'
-          } else if (row.specification == 'Нержавеющая сталь') {
-            row.specification = 'Stainless steel'
-          }
-          else if (row.specification == 'Алюминий') {
-            row.specification = 'Aluminum'
-          }
-          else if (row.specification == 'Пластик') {
-            row.specification = 'Plastic'
-          }
-          else if (row.specification == 'Бук') {
-            row.specification = 'Beech'
-          }
-          else if (row.specification == 'Резина') {
-            row.specification = 'Rubber'
-          }
-          else if (row.specification == 'Стекло') {
-            row.specification = 'Glass'
-          } 
+        if (row.specifications_id == 786) {
           
-       let newSpecification = row.specification
+            let newSpecification = (parseFloat(row.specification * 2.2).toFixed(2)).toString();
+          newSpecification = Math.round(newSpecification * 100) / 100;
+        if (newSpecification % 1 === 0) {
+          newSpecification = Math.round(newSpecification);
+        }
           let productId = row.products_id;
-          row.language_id = 2
-          row.specification = newSpecification
-          console.log(row.specification, row.products_id)
+          row.language_id = 2;
+          row.specification = newSpecification;
+          console.log(row.specification, row.products_id, row.specifications_id);
 
           // запрос на добавление должен выглядеть подобным образом: INSERT INTO products_specifications(products_id,language_id, specification, specifications_id) VALUES('52','2','232.98', '419')
          
