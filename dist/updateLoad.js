@@ -7,6 +7,8 @@ const connection = mysql.createConnection({
   password: process.env.password,
 });
 
+
+
 connection.connect((err) => {
     if (err) throw err;
     console.log('Успешное подключение к БД!');
