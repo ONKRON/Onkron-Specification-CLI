@@ -1,47 +1,22 @@
-const mysql = require("mysql2");
+const { runTask } = require("./cli");
+const { printStats } = require("./lib/runner");
 
-const connection = mysql.createConnection({
-  host: process.env.host,
-  user: process.env.user,
-  database: process.env.database,
-  password: process.env.password,
-});
+const sourceLanguageId = Number(process.env.SOURCE_LANGUAGE_ID || 1);
+const targetRaw = String(process.env.TARGET_LANGUAGE_ID || "all").trim().toLowerCase();
+const targetLanguageId = targetRaw === "all" ? "all" : Number(targetRaw);
+const dryRun = process.env.DRY_RUN === "1";
 
-connection.connect((err) => {
-    if (err) throw err;
-    console.log('Успешное подключение к БД!');
-    let sql = 'SELECT * FROM products_specifications';
-    connection.query(sql, (err, results) => {
-      if (err) throw err;
-      results.forEach((row)=> {
-        if (row.specifications_id == 60) {
-        
-          // чтобы получить единицу в дюймах 
-          let newSpecification = (parseFloat(row.specification * 0.04).toFixed(2)).toString();
-           
-          newSpecification = Math.round(newSpecification * 100) / 100;
-        if (newSpecification % 1 === 0) {
-          newSpecification = Math.round(newSpecification);
-        }
-          let productId = row.products_id;
-          row.language_id = 2
-          row.specification = newSpecification
-          console.log(row.specification, row.products_id)
-
-          // запрос на добавление должен выглядеть подобным образом: INSERT INTO products_specifications(products_id,language_id, specification, specifications_id) VALUES('52','2','232.98', '419')
-         
-          let updateSql = `INSERT INTO products_specifications(products_id,language_id, specification, specifications_id) VALUES('${productId}','${row.language_id}','${row.specification}','${row.specifications_id}')`;
-          connection.query(updateSql, (err, updateResult) => {
-            if (err) throw err;
-            console.log('Обновлена таблица у продукта с ID:', productId);
-            console.log(updateResult)
-            console.log(newSpecification)
-            console.log(updateSql)
-          });
-          
-        }
-      })
-        
-
-    });
+runTask("height", {
+  sourceLanguageId,
+  materialLanguageId: "all",
+  targetLanguageId,
+  dryRun,
+})
+  .then((result) => {
+    const stats = Array.isArray(result) ? result : [result];
+    stats.forEach(printStats);
+  })
+  .catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
   });

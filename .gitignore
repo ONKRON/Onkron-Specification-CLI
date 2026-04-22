@@ -1,2 +1,7 @@
 *node_modules/*
 .env*
+!.env.signing.example
+release/
+dist/mac-arm64/
+*.log
+.DS_Store

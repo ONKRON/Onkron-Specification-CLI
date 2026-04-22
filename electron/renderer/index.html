@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VamShop Spec GUI</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">VamShop Automation</p>
+        <h1>Specification Control Center</h1>
+        <p class="subtitle">
+          Управляйте массовым заполнением спецификаций через GUI без ручного запуска CLI-команд.
+        </p>
+      </header>
+
+      <section class="panel settings" aria-label="Settings">
+        <h2>Run Settings</h2>
+
+        <div class="form-grid">
+          <label>
+            Source language
+            <input id="sourceLanguageId" type="number" min="1" value="1" />
+          </label>
+
+          <label>
+            Material target language
+            <select id="materialLanguageId"></select>
+          </label>
+
+          <label>
+            Color/Height/Load target language
+            <select id="targetLanguageId"></select>
+          </label>
+
+          <label class="checkbox">
+            <input id="dryRun" type="checkbox" />
+            <span>Dry run (без записи в БД)</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel actions" aria-label="Actions">
+        <h2>Specification Tasks</h2>
+        <div class="cards">
+          <button class="task-card" data-task="material">
+            <strong>Material</strong>
+            <span>Переводы материалов</span>
+          </button>
+          <button class="task-card" data-task="color">
+            <strong>Color</strong>
+            <span>Переводы цвета</span>
+          </button>
+          <button class="task-card" data-task="height">
+            <strong>Height</strong>
+            <span>Конвертация высоты</span>
+          </button>
+          <button class="task-card" data-task="load">
+            <strong>Load</strong>
+            <span>Конвертация нагрузки</span>
+          </button>
+          <button class="task-card accent" data-task="all">
+            <strong>Run All</strong>
+            <span>Полный прогон всех функций</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel output" aria-label="Output">
+        <div class="output-header">
+          <h2>Execution Report</h2>
+          <button id="clearOutput" class="ghost">Clear</button>
+        </div>
+        <pre id="output">Ready.</pre>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

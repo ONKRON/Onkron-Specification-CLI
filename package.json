@@ -1,17 +1,29 @@
 {
-  "name": "automatization",
+  "name": "vamshop-spec-cli",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "CLI for VamShop product specification automation",
+  "main": "electron/main.js",
+  "bin": {
+    "vamshop-spec": "./dist/cli.js"
+  },
   "scripts": {
-    "nodemon": "nodemon ./dist/index.js",
-    "delete": "nodemon ./dist/delete.js",
-    "start": "node ./dist/index.js",
-    "test": "jest",
-    "build": "tsc",
-    "lint": "eslint",
-    "update load": "node ./dist/updateLoad.js",
-    "material": "node ./dist/updateMaterial.js"
+    "start": "node ./dist/cli.js",
+    "cli": "node ./dist/cli.js",
+    "dev": "nodemon ./dist/cli.js",
+    "gui": "electron ./electron/main.js",
+    "gui:dev": "electron ./electron/main.js --enable-logging",
+    "icons:build": "node ./scripts/generate-icons.js",
+    "pack": "electron-builder --dir",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:mac:unsigned": "electron-builder --mac dmg --config.mac.identity=null",
+    "dist:win": "electron-builder --win nsis",
+    "dist:linux": "electron-builder --linux AppImage",
+    "dist:all": "electron-builder -mwl",
+    "spec:material": "node ./dist/cli.js run material",
+    "spec:color": "node ./dist/cli.js run color",
+    "spec:height": "node ./dist/cli.js run height",
+    "spec:load": "node ./dist/cli.js run load",
+    "spec:all": "node ./dist/cli.js run all"
   },
   "keywords": [],
   "author": "",
@@ -24,5 +36,53 @@
     "mysql2": "^3.9.1",
     "nodemon": "^3.0.3",
     "readline": "^1.3.0"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^3.1.0",
+    "electron": "^37.0.0",
+    "electron-builder": "^24.13.3",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.34.3"
+  },
+  "build": {
+    "appId": "com.vamshop.specgui",
+    "productName": "VamShop Spec GUI",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icons/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements/mac.plist",
+      "entitlementsInherit": "build/entitlements/mac.plist",
+      "gatekeeperAssess": false,
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "${productName}-${version}-mac.${ext}"
+    },
+    "win": {
+      "icon": "build/icons/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-${version}-win.${ext}"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "target": [
+        "AppImage"
+      ],
+      "artifactName": "${productName}-${version}-linux.${ext}"
+    },
+    "afterSign": "scripts/notarize.js"
   }
 }
