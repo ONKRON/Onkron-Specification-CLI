@@ -1,25 +1,68 @@
-const { SPEC_IDS } = require("../config/specs");
+const { HEIGHT_SPEC_IDS, HEIGHT_SPEC_LABELS } = require("../config/specs");
 const { runSpecificationUpdate } = require("../lib/runner");
-const { parseNumber, formatNumber } = require("../lib/numbers");
+const {
+  formatQuarterFraction,
+  transformNumericTokens,
+  stripMillimeterUnits,
+} = require("../lib/numbers");
 
 const MM_TO_INCH = Number(process.env.MM_TO_INCH_FACTOR || 0.04);
+const US_LANGUAGE_ID = 2;
 
-async function updateHeight({ targetLanguageId = 2, sourceLanguageId = 1, dryRun = false }) {
-  return runSpecificationUpdate({
-    taskName: "update-height",
-    sourceLanguageId,
-    targetLanguageId,
-    specificationId: SPEC_IDS.height,
-    dryRun,
-    transform: (row) => {
-      const mmValue = parseNumber(row.specification);
-      if (mmValue === null) {
-        return null;
-      }
+function normalizeSpecIds(specIds) {
+  const source = Array.isArray(specIds) ? specIds : HEIGHT_SPEC_IDS;
+  const normalized = source
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
 
-      return formatNumber(mmValue * MM_TO_INCH);
-    },
-  });
+  if (normalized.length === 0) {
+    throw new Error("No valid spec ids provided for height update");
+  }
+
+  return [...new Set(normalized)];
+}
+
+async function updateHeight({
+  targetLanguageId = 2,
+  sourceLanguageId = 1,
+  dryRun = false,
+  specIds = HEIGHT_SPEC_IDS,
+}) {
+  const ids = normalizeSpecIds(specIds);
+  const stats = [];
+
+  for (const specificationId of ids) {
+    const label = HEIGHT_SPEC_LABELS[specificationId] || `height-${specificationId}`;
+    stats.push(
+      await runSpecificationUpdate({
+        taskName: `update-${label}`,
+        sourceLanguageId,
+        targetLanguageId,
+        specificationId,
+        dryRun,
+        transform: (row) => {
+          const value =
+            row.specification === null || row.specification === undefined
+              ? ""
+              : String(row.specification).trim();
+          if (!value) {
+            return null;
+          }
+
+          if (targetLanguageId === US_LANGUAGE_ID) {
+            const converted = transformNumericTokens(value, (mmValue) =>
+              formatQuarterFraction(mmValue * MM_TO_INCH)
+            );
+            return stripMillimeterUnits(converted);
+          }
+
+          return value;
+        },
+      })
+    );
+  }
+
+  return stats.length === 1 ? stats[0] : stats;
 }
 
 module.exports = {

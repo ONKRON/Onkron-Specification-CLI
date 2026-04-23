@@ -3,7 +3,17 @@ const fs = require("fs");
 const { app, BrowserWindow, ipcMain, nativeImage } = require("electron");
 const { COUNTRY_BY_LANGUAGE_ID } = require("../dist/config/specs");
 const { runTask } = require("../dist/cli");
+const {
+  listTransferProducts,
+  getTransferProductSpecifications,
+  transferSelectedProductSpecifications,
+} = require("../dist/lib/transfer");
+const { isAuthRequired, authenticate } = require("./auth");
 const ALL_TARGETS = "all";
+const TRANSFER_SOURCE_LANGUAGE_ID = Number(
+  process.env.TRANSFER_SOURCE_LANGUAGE_ID || 1
+);
+let sessionUser = null;
 
 function resolveIconPath() {
   const candidates = [
@@ -44,6 +54,33 @@ function resolveIconPath() {
 }
 
 const appIconPath = resolveIconPath();
+
+function getSessionState() {
+  const required = isAuthRequired();
+  if (!required) {
+    return {
+      required: false,
+      authenticated: true,
+      user: { id: 0, username: "local" },
+    };
+  }
+
+  return {
+    required: true,
+    authenticated: Boolean(sessionUser),
+    user: sessionUser,
+  };
+}
+
+function ensureAuthenticated() {
+  const session = getSessionState();
+  if (!session.required) {
+    return;
+  }
+  if (!session.authenticated) {
+    throw new Error("Authentication required");
+  }
+}
 
 function normalizeLanguageInput(value, fallback, { allowAll = false } = {}) {
   if (value === undefined || value === null || value === "") {
@@ -92,7 +129,26 @@ function createWindow() {
 
 ipcMain.handle("spec:get-countries", async () => COUNTRY_BY_LANGUAGE_ID);
 
+ipcMain.handle("spec:auth:get-config", async () => ({
+  required: isAuthRequired(),
+}));
+
+ipcMain.handle("spec:auth:get-session", async () => getSessionState());
+
+ipcMain.handle("spec:auth:login", async (_event, credentials) => {
+  const user = await authenticate(credentials);
+  sessionUser = user;
+  return getSessionState();
+});
+
+ipcMain.handle("spec:auth:logout", async () => {
+  sessionUser = null;
+  return getSessionState();
+});
+
 ipcMain.handle("spec:run-task", async (_event, payload) => {
+  ensureAuthenticated();
+
   const {
     task,
     sourceLanguageId = 1,
@@ -125,6 +181,74 @@ ipcMain.handle("spec:run-task", async (_event, payload) => {
     tasks,
     finishedAt: new Date().toISOString(),
   };
+});
+
+ipcMain.handle("spec:transfer:list-products", async (_event, payload) => {
+  ensureAuthenticated();
+
+  const {
+    search = "",
+    limit = 120,
+  } = payload || {};
+
+  return listTransferProducts({
+    sourceLanguageId: normalizeLanguageInput(
+      TRANSFER_SOURCE_LANGUAGE_ID,
+      1
+    ),
+    search: String(search || ""),
+    limit: Number(limit) || 120,
+  });
+});
+
+ipcMain.handle("spec:transfer:get-product-specs", async (_event, payload) => {
+  ensureAuthenticated();
+
+  const {
+    productId,
+  } = payload || {};
+
+  const normalizedProductId = Number(productId);
+  if (!Number.isInteger(normalizedProductId) || normalizedProductId < 1) {
+    throw new Error("Valid productId is required");
+  }
+
+  return getTransferProductSpecifications({
+    sourceLanguageId: normalizeLanguageInput(
+      TRANSFER_SOURCE_LANGUAGE_ID,
+      1
+    ),
+    productId: normalizedProductId,
+  });
+});
+
+ipcMain.handle("spec:transfer:submit", async (_event, payload) => {
+  ensureAuthenticated();
+
+  const {
+    productId,
+    targetLanguageId = ALL_TARGETS,
+    specIds = [],
+    dryRun = false,
+  } = payload || {};
+
+  const normalizedProductId = Number(productId);
+  if (!Number.isInteger(normalizedProductId) || normalizedProductId < 1) {
+    throw new Error("Valid productId is required");
+  }
+
+  return transferSelectedProductSpecifications({
+    productId: normalizedProductId,
+    sourceLanguageId: normalizeLanguageInput(
+      TRANSFER_SOURCE_LANGUAGE_ID,
+      1
+    ),
+    targetLanguageId: normalizeLanguageInput(targetLanguageId, ALL_TARGETS, {
+      allowAll: true,
+    }),
+    specIds: Array.isArray(specIds) ? specIds.map((id) => Number(id)) : [],
+    dryRun: Boolean(dryRun),
+  });
 });
 
 app.whenReady().then(() => {

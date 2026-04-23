@@ -8,6 +8,7 @@ const {
   updateColor,
   updateHeight,
   updateLoad,
+  updateAutofill,
 } = require("./tasks");
 const ALL_TARGETS = "all";
 
@@ -23,12 +24,13 @@ Tasks:
   color
   height
   load
+  autofill
   all
 
 Flags:
   --lang <id|all>       Target language for material (2..8) or all targets
   --material-lang <id|all> Alias for --lang in task=all
-  --target-lang <id|all> Target language for color/height/load (default: all)
+  --target-lang <id|all> Target language for color/height/load/autofill (default: all)
   --source-lang <id>    Source language (default: 1)
   --dry-run             Validate + report without DB writes
   --help                Show this help
@@ -36,6 +38,7 @@ Flags:
 Examples:
   node dist/cli.js run material --lang 3
   node dist/cli.js run material --lang all
+  node dist/cli.js run autofill --target-lang all
   node dist/cli.js run load --target-lang 2 --dry-run
   node dist/cli.js run all --material-lang all --target-lang all
 `;
@@ -93,13 +96,17 @@ async function runAcrossTargets(taskRunner, {
   const stats = [];
 
   for (const targetLanguageId of targetLanguages) {
-    stats.push(
-      await taskRunner({
-        sourceLanguageId,
-        targetLanguageId,
-        dryRun,
-      })
-    );
+    const result = await taskRunner({
+      sourceLanguageId,
+      targetLanguageId,
+      dryRun,
+    });
+
+    if (Array.isArray(result)) {
+      stats.push(...result);
+    } else {
+      stats.push(result);
+    }
   }
 
   return collapseStats(stats);
@@ -163,7 +170,7 @@ function parseArgs(argv) {
       continue;
     }
 
-    if (!command && ["material", "color", "height", "load", "all"].includes(token)) {
+    if (!command && ["material", "color", "height", "load", "autofill", "all"].includes(token)) {
       command = "run";
       task = token;
       continue;
@@ -205,6 +212,13 @@ async function runTask(task, flags) {
         dryRun: flags.dryRun,
       });
     }
+    case "autofill": {
+      return runAcrossTargets(updateAutofill, {
+        sourceLanguageId: flags.sourceLanguageId,
+        targetSelection: flags.targetLanguageId,
+        dryRun: flags.dryRun,
+      });
+    }
     case "all": {
       const stats = [];
       const materialStats = await runAcrossTargets(updateMaterial, {
@@ -239,6 +253,14 @@ async function runTask(task, flags) {
       stats.push(
         ...(Array.isArray(loadStats) ? loadStats : [loadStats])
       );
+      const autofillStats = await runAcrossTargets(updateAutofill, {
+        sourceLanguageId: flags.sourceLanguageId,
+        targetSelection: flags.targetLanguageId,
+        dryRun: flags.dryRun,
+      });
+      stats.push(
+        ...(Array.isArray(autofillStats) ? autofillStats : [autofillStats])
+      );
 
       return stats;
     }
@@ -272,7 +294,8 @@ async function runInteractive() {
     console.log("2) Update color");
     console.log("3) Update height");
     console.log("4) Update load");
-    console.log("5) Run all tasks");
+    console.log("5) Update autofill specs");
+    console.log("6) Run all tasks");
     console.log("0) Exit\n");
 
     const selection = await ask(rl, "Select action: ");
@@ -336,6 +359,14 @@ async function runInteractive() {
         });
       }
     } else if (selection === "5") {
+      task = "autofill";
+      const target = await ask(rl, "Target language id [all]: ");
+      if (target) {
+        flags.targetLanguageId = parseLanguageSelection(target, {
+          allowAll: true,
+        });
+      }
+    } else if (selection === "6") {
       task = "all";
       printCountries();
       const materialLang = await ask(rl, "Material target language id [all]: ");
@@ -344,7 +375,10 @@ async function runInteractive() {
           allowAll: true,
         });
       }
-      const target = await ask(rl, "Target language for color/height/load [all]: ");
+      const target = await ask(
+        rl,
+        "Target language for color/height/load/autofill [all]: "
+      );
       if (target) {
         flags.targetLanguageId = parseLanguageSelection(target, {
           allowAll: true,

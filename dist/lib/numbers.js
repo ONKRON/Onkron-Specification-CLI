@@ -23,7 +23,98 @@ function formatNumber(value) {
   return rounded.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
+function formatQuarterFraction(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  const rounded = Math.round(value * 4) / 4;
+  const sign = rounded < 0 ? "-" : "";
+  const absValue = Math.abs(rounded);
+  let integerPart = Math.floor(absValue);
+  let quarterPart = Math.round((absValue - integerPart) * 4);
+
+  if (quarterPart === 4) {
+    integerPart += 1;
+    quarterPart = 0;
+  }
+
+  if (quarterPart === 0) {
+    return `${sign}${integerPart}`;
+  }
+
+  const quarterSymbolByValue = {
+    1: "¼",
+    2: "½",
+    3: "¾",
+  };
+
+  const fraction = quarterSymbolByValue[quarterPart] || "";
+  if (!fraction) {
+    return `${sign}${formatNumber(rounded)}`;
+  }
+
+  if (integerPart === 0) {
+    return `${sign}${fraction}`;
+  }
+
+  return `${sign}${integerPart} ${fraction}`;
+}
+
+function transformNumericTokens(rawValue, transformNumber) {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  if (typeof transformNumber !== "function") {
+    return null;
+  }
+
+  const source = String(rawValue).trim();
+  if (!source) {
+    return null;
+  }
+
+  let matched = false;
+  const transformed = source.replace(/(?<!\d)-?\d+(?:[.,]\d+)?/g, (token) => {
+    const numeric = Number(String(token).replace(",", "."));
+    if (!Number.isFinite(numeric)) {
+      return token;
+    }
+
+    matched = true;
+    const next = transformNumber(numeric);
+    if (next === null || next === undefined) {
+      return token;
+    }
+
+    if (typeof next === "number") {
+      return formatNumber(next);
+    }
+
+    return String(next);
+  });
+
+  return matched ? transformed : null;
+}
+
+function stripMillimeterUnits(rawValue) {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  const normalized = String(rawValue)
+    .replace(/\s*(?:мм|mm)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return normalized || null;
+}
+
 module.exports = {
   parseNumber,
   formatNumber,
+  formatQuarterFraction,
+  transformNumericTokens,
+  stripMillimeterUnits,
 };

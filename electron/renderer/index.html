@@ -8,9 +8,41 @@
   </head>
   <body>
     <div class="noise"></div>
+    <div id="requestLoader" class="request-loader hidden" role="status" aria-live="polite">
+      <div class="request-loader-card">
+        <span class="spinner" aria-hidden="true"></span>
+        <p id="requestLoaderText">Выполняется запрос...</p>
+      </div>
+    </div>
+    <section id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <p class="eyebrow">Restricted Access</p>
+        <h2>Sign In</h2>
+        <p class="auth-subtitle">
+          Enter credentials from your Railway auth database.
+        </p>
+        <form id="loginForm" class="auth-form">
+          <label>
+            Username
+            <input id="loginUsername" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </label>
+          <button id="loginButton" class="auth-submit" type="submit">Sign in</button>
+        </form>
+        <p id="loginMessage" class="auth-message"></p>
+      </div>
+    </section>
+
     <main class="app-shell">
       <header class="hero">
         <p class="eyebrow">VamShop Automation</p>
+        <div class="hero-meta">
+          <span id="sessionState" class="session-state">Checking session...</span>
+          <button id="logoutButton" class="ghost" hidden>Logout</button>
+        </div>
         <h1>Specification Control Center</h1>
         <p class="subtitle">
           Управляйте массовым заполнением спецификаций через GUI без ручного запуска CLI-команд.
@@ -62,6 +94,10 @@
             <strong>Load</strong>
             <span>Конвертация нагрузки</span>
           </button>
+          <button class="task-card" data-task="autofill">
+            <strong>Autofill</strong>
+            <span>Копирование spec ID по списку</span>
+          </button>
           <button class="task-card accent" data-task="all">
             <strong>Run All</strong>
             <span>Полный прогон всех функций</span>
@@ -69,10 +105,45 @@
         </div>
       </section>
 
+      <section class="panel transfer" aria-label="Manual Transfer">
+        <div class="transfer-header">
+          <h2>Выбрать Продукт Для Переноса</h2>
+          <button id="loadTransferProducts" class="ghost">Найти продукты</button>
+        </div>
+
+        <div class="transfer-controls">
+          <label>
+            Поиск по ID / названию / модели
+            <input id="transferSearch" type="text" placeholder="например 12345 или ONKRON N1L" />
+          </label>
+        </div>
+        <p class="transfer-note">Источник для ручного переноса: language_id = 1</p>
+
+        <div id="transferProducts" class="product-list"></div>
+        <p id="transferSelectedProduct" class="transfer-selected">
+          Продукт не выбран.
+        </p>
+
+        <div id="transferSpecs" class="transfer-specs"></div>
+
+        <div class="transfer-actions">
+          <button id="submitTransfer" class="task-card accent transfer-submit">
+            <strong>Отправить</strong>
+            <span>Перенести отмеченные пункты</span>
+          </button>
+        </div>
+      </section>
+
       <section class="panel output" aria-label="Output">
         <div class="output-header">
           <h2>Execution Report</h2>
-          <button id="clearOutput" class="ghost">Clear</button>
+          <div class="output-tools">
+            <span id="requestStatus" class="request-status hidden">
+              <span class="spinner spinner-small" aria-hidden="true"></span>
+              <span id="requestStatusText">Запрос выполняется...</span>
+            </span>
+            <button id="clearOutput" class="ghost">Clear</button>
+          </div>
         </div>
         <pre id="output">Ready.</pre>
       </section>

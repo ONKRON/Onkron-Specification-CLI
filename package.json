@@ -12,6 +12,11 @@
     "dev": "nodemon ./dist/cli.js",
     "gui": "electron ./electron/main.js",
     "gui:dev": "electron ./electron/main.js --enable-logging",
+    "auth:hash": "node ./scripts/hash-password.js",
+    "auth:init-table": "node ./scripts/auth-admin.js init-table",
+    "auth:create-user": "node ./scripts/auth-admin.js create-user",
+    "auth:reset-password": "node ./scripts/auth-admin.js reset-password",
+    "auth:disable-user": "node ./scripts/auth-admin.js disable-user",
     "icons:build": "node ./scripts/generate-icons.js",
     "pack": "electron-builder --dir",
     "dist:mac": "electron-builder --mac dmg",
@@ -23,6 +28,7 @@
     "spec:color": "node ./dist/cli.js run color",
     "spec:height": "node ./dist/cli.js run height",
     "spec:load": "node ./dist/cli.js run load",
+    "spec:autofill": "node ./dist/cli.js run autofill",
     "spec:all": "node ./dist/cli.js run all"
   },
   "keywords": [],
@@ -31,6 +37,7 @@
   "dependencies": {
     "async": "^3.2.5",
     "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.5.0",
     "fs": "^0.0.1-security",
     "mysql2": "^3.9.1",

@@ -26,9 +26,23 @@ async function withDbConnection(fn) {
 async function fetchSourceRows(connection, { sourceLanguageId, specificationId }) {
   const [rows] = await connection.execute(
     `
-      SELECT products_id, language_id, specification, specifications_id
-      FROM products_specifications
-      WHERE language_id = ? AND specifications_id = ?
+      SELECT
+        ps.products_id,
+        ps.language_id,
+        ps.specification,
+        ps.specifications_id
+      FROM products_specifications ps
+      INNER JOIN (
+        SELECT
+          products_id,
+          specifications_id,
+          language_id,
+          MAX(products_specification_id) AS max_id
+        FROM products_specifications
+        WHERE language_id = ? AND specifications_id = ?
+        GROUP BY products_id, specifications_id, language_id
+      ) latest
+        ON latest.max_id = ps.products_specification_id
     `,
     [sourceLanguageId, specificationId]
   );
@@ -42,14 +56,24 @@ async function upsertSpecification(connection, {
   specification,
   specificationId,
 }) {
+  const [updateResult] = await connection.execute(
+    `
+      UPDATE products_specifications
+      SET specification = ?
+      WHERE products_id = ? AND language_id = ? AND specifications_id = ?
+    `,
+    [specification, productId, languageId, specificationId]
+  );
+
+  if (updateResult.affectedRows > 0) {
+    return;
+  }
+
   await connection.execute(
     `
       INSERT INTO products_specifications
         (products_id, language_id, specification, specifications_id)
       VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        specification = VALUES(specification),
-        language_id = VALUES(language_id)
     `,
     [productId, languageId, specification, specificationId]
   );
