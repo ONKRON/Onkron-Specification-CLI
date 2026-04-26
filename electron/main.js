@@ -271,6 +271,7 @@ ipcMain.handle("spec:transfer:submit", async (_event, payload) => {
       ? result.targetLanguageIds.join(",")
       : result.targetLanguageId,
     productId: result.productId,
+    productName: result.productName,
     specIds: result.specIds,
     stats: [result],
   });

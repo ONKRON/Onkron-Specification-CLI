@@ -4,10 +4,12 @@ const {
   formatQuarterFraction,
   transformNumericTokens,
   stripMillimeterUnits,
+  normalizeDimensionSeparators,
 } = require("../lib/numbers");
 
 const MM_TO_INCH = Number(process.env.MM_TO_INCH_FACTOR || 0.04);
 const US_LANGUAGE_ID = 2;
+const DIMENSION_SPEC_IDS = new Set([68, 760, 762]);
 
 function normalizeSpecIds(specIds) {
   const source = Array.isArray(specIds) ? specIds : HEIGHT_SPEC_IDS;
@@ -53,7 +55,20 @@ async function updateHeight({
             const converted = transformNumericTokens(value, (mmValue) =>
               formatQuarterFraction(mmValue * MM_TO_INCH)
             );
-            return stripMillimeterUnits(converted);
+            const withoutUnits = stripMillimeterUnits(converted);
+            if (!withoutUnits) {
+              return null;
+            }
+
+            if (DIMENSION_SPEC_IDS.has(specificationId)) {
+              return normalizeDimensionSeparators(withoutUnits);
+            }
+
+            return withoutUnits;
+          }
+
+          if (DIMENSION_SPEC_IDS.has(specificationId)) {
+            return normalizeDimensionSeparators(value);
           }
 
           return value;

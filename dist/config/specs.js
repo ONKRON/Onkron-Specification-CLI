@@ -97,13 +97,13 @@ const AUTOFILL_SPEC_IDS = parseSpecIdsFromEnv(
   DEFAULT_AUTOFILL_SPEC_IDS
 );
 
-const DEFAULT_LOAD_SPEC_IDS = [23, 786];
+const DEFAULT_LOAD_SPEC_IDS = [23, 786, 766, 767, 763];
 const LOAD_SPEC_IDS = parseSpecIdsFromEnv(
   process.env.SPEC_IDS_LOAD,
   DEFAULT_LOAD_SPEC_IDS
 );
 
-const DEFAULT_HEIGHT_SPEC_IDS = [754, 722, 721, 720];
+const DEFAULT_HEIGHT_SPEC_IDS = [754, 722, 721, 720, 762, 760, 68];
 const HEIGHT_SPEC_IDS = parseSpecIdsFromEnv(
   process.env.SPEC_IDS_HEIGHT,
   DEFAULT_HEIGHT_SPEC_IDS
@@ -125,6 +125,9 @@ const AUTOFILL_SPEC_LABELS = {
 const LOAD_SPEC_LABELS = {
   23: "max-monitor-tv-weight",
   786: "max-load",
+  766: "gross-weight-individual",
+  767: "gross-weight-group",
+  763: "volume-individual-package",
 };
 
 const HEIGHT_SPEC_LABELS = {
@@ -132,6 +135,9 @@ const HEIGHT_SPEC_LABELS = {
   722: "adjustable-height-min",
   721: "reach-from-mount-min",
   720: "reach-from-mount-max",
+  762: "package-dimensions-individual",
+  760: "dimensions-assembled",
+  68: "package-dimensions-group",
 };
 
 const SPEC_ID_NAMES = {

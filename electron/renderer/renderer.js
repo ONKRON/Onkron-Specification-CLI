@@ -116,21 +116,66 @@ function renderTransferProducts(products) {
       product && product.label !== null && product.label !== undefined
         ? String(product.label).trim()
         : "";
+    const imageUrl =
+      product && product.imageUrl !== null && product.imageUrl !== undefined
+        ? String(product.imageUrl).trim()
+        : "";
+    const numericStatus = Number(product?.status);
+    const statusValue =
+      numericStatus === 1 ? 1 : numericStatus === 0 ? 0 : null;
+    const statusLabel =
+      statusValue === 1
+        ? "Активен"
+        : statusValue === 0
+          ? "Неактивен"
+          : "Статус ?";
+    const statusClass =
+      statusValue === 1
+        ? "is-active"
+        : statusValue === 0
+          ? "is-inactive"
+          : "is-unknown";
 
     const button = document.createElement("button");
     button.type = "button";
     button.className = "product-button";
     button.dataset.productId = String(productId);
 
+    const thumb = document.createElement("span");
+    thumb.className = "product-button-thumb";
+
+    if (imageUrl) {
+      const image = document.createElement("img");
+      image.className = "product-button-image";
+      image.src = imageUrl;
+      image.alt = productName || `Product #${productId}`;
+      image.loading = "lazy";
+      image.referrerPolicy = "no-referrer";
+      image.addEventListener("error", () => {
+        thumb.classList.add("empty");
+        image.remove();
+      });
+      thumb.appendChild(image);
+    } else {
+      thumb.classList.add("empty");
+    }
+
+    const topLine = document.createElement("div");
+    topLine.className = "product-button-top";
+
     const idLine = document.createElement("span");
     idLine.className = "product-button-id";
-    idLine.textContent = `#${productId}`;
+    idLine.textContent = productModel
+      ? `#${productId} | ${productModel}`
+      : `#${productId}`;
+
+    const statusBadge = document.createElement("span");
+    statusBadge.className = `product-status ${statusClass}`;
+    statusBadge.textContent = statusLabel;
 
     const metaLine = document.createElement("span");
     metaLine.className = "product-button-meta";
-    if (productName && productModel) {
-      metaLine.textContent = `${productName} (${productModel})`;
-    } else if (productName) {
+    if (productName) {
       metaLine.textContent = productName;
     } else if (productModel) {
       metaLine.textContent = productModel;
@@ -141,7 +186,10 @@ function renderTransferProducts(products) {
     }
 
     button.title = metaLine.textContent;
-    button.appendChild(idLine);
+    button.appendChild(thumb);
+    topLine.appendChild(idLine);
+    topLine.appendChild(statusBadge);
+    button.appendChild(topLine);
     button.appendChild(metaLine);
 
     if (productId === selectedTransferProductId) {
@@ -355,6 +403,7 @@ function formatTransferStats(stats) {
   return [
     `Task: ${stats.taskName}`,
     `Product ID: ${stats.productId}`,
+    `Product Name: ${stats.productName || "-"}`,
     `Source language: ${stats.sourceLanguageId}`,
     `Targets: ${Array.isArray(stats.targetLanguageIds) ? stats.targetLanguageIds.join(", ") : stats.targetLanguageId}`,
     `Spec IDs: ${Array.isArray(stats.specIds) ? stats.specIds.join(", ") : "-"}`,

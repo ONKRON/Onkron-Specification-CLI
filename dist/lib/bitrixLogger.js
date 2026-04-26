@@ -1,14 +1,16 @@
-const APP_TAG = "Onkron Spec CLI";
+const APP_TAG = "Webobscurium";
 const BITRIX_WEBHOOK_URL = String(process.env.BITRIX_WEBHOOK_URL || "").trim();
 const BITRIX_WEBHOOK_BASE_URL = String(
-  process.env.BITRIX_WEBHOOK_BASE_URL || ""
+  process.env.BITRIX_WEBHOOK_BASE_URL || "",
 ).trim();
 const BITRIX_CHAT_URL = String(process.env.BITRIX_CHAT_URL || "").trim();
 const BITRIX_DIALOG_ID = String(process.env.BITRIX_DIALOG_ID || "").trim();
 const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 4000);
 
 function normalizeBaseUrl(url) {
-  return String(url || "").trim().replace(/\/+$/, "");
+  return String(url || "")
+    .trim()
+    .replace(/\/+$/, "");
 }
 
 function parseDialogIdFromChatUrl(chatUrl) {
@@ -66,6 +68,7 @@ function buildMessage({
   sourceLanguageId,
   targetLanguageId,
   productId,
+  productName,
   specIds,
   stats,
 }) {
@@ -93,6 +96,10 @@ function buildMessage({
 
   if (productId) {
     lines.push(`Product ID: ${productId}`);
+  }
+
+  if (productName) {
+    lines.push(`Product: ${productName}`);
   }
 
   if (Array.isArray(specIds) && specIds.length > 0) {
@@ -161,6 +168,7 @@ async function sendBitrixChangeLog({
   sourceLanguageId = null,
   targetLanguageId = null,
   productId = null,
+  productName = null,
   specIds = [],
   stats = [],
 }) {
@@ -179,6 +187,7 @@ async function sendBitrixChangeLog({
     sourceLanguageId,
     targetLanguageId,
     productId,
+    productName,
     specIds,
     stats: normalizedStats,
   });
@@ -192,6 +201,7 @@ async function sendBitrixChangeLog({
     sourceLanguageId: sourceLanguageId ?? null,
     targetLanguageId: targetLanguageId ?? null,
     productId: productId ?? null,
+    productName: productName ?? null,
     specIds: Array.isArray(specIds) ? specIds : [],
     updated,
     skipped: sumBy(normalizedStats, "skipped"),

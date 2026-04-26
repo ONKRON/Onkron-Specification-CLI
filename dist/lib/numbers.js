@@ -111,10 +111,47 @@ function stripMillimeterUnits(rawValue) {
   return normalized || null;
 }
 
+function normalizeDimensionSeparators(rawValue) {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  const normalized = String(rawValue)
+    .replace(/\s*[xх×]\s*/giu, " x ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return normalized || null;
+}
+
+function normalizeVolumeToM3(rawNumericValue, {
+  largeValueThreshold = 1000,
+  largeValueDivisor = 1_000_000,
+} = {}) {
+  const value = Number(rawNumericValue);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  const threshold = Number(largeValueThreshold);
+  const divisor = Number(largeValueDivisor);
+  if (!Number.isFinite(threshold) || !Number.isFinite(divisor) || divisor <= 0) {
+    return value;
+  }
+
+  if (Math.abs(value) >= threshold) {
+    return value / divisor;
+  }
+
+  return value;
+}
+
 module.exports = {
   parseNumber,
   formatNumber,
   formatQuarterFraction,
   transformNumericTokens,
   stripMillimeterUnits,
+  normalizeDimensionSeparators,
+  normalizeVolumeToM3,
 };

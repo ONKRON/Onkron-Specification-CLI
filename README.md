@@ -60,19 +60,24 @@ BITRIX_CHAT_URL=https://your-company.bitrix24.ru/online/?IM_DIALOG=chat101362
 # option B: generic JSON webhook (if you use your own relay endpoint)
 BITRIX_WEBHOOK_URL=https://example.com/webhook
 BITRIX_TIMEOUT_MS=4000
+PRODUCT_IMAGE_BASE_URL=https://shop.onkron.ru/images/product_images/info_images
 
 # optional specification IDs
 SPEC_ID_MATERIAL=61
 SPEC_ID_COLOR=60
-SPEC_IDS_HEIGHT=754,722,721,720
+SPEC_IDS_HEIGHT=754,722,721,720,762,760,68
 SPEC_ID_LOAD=786
-SPEC_IDS_LOAD=23,786
+SPEC_IDS_LOAD=23,786,766,767,763
 SPEC_IDS_AUTOFILL=24,22,709,723,724,725,726,715,67
 SPEC_IDS_TRANSFER=766,22,23,24,762,760,759,758,757,60,61,751,67,68,773,709,715,767,720,721,722,723,724,725,726,769,770,753,754,755,756,752,750,749,763,765,772,771,764,768,779,774,775,776,777,778,780,781,782,784,785,786,787
 
 # optional conversion factors
 MM_TO_INCH_FACTOR=0.04
 KG_TO_POUNDS_FACTOR=2.2
+M3_TO_FT3_FACTOR=35.31
+VOLUME_FT3_DECIMALS=6
+VOLUME_RAW_TO_M3_THRESHOLD=1000
+VOLUME_RAW_TO_M3_DIVISOR=1000000
 ```
 
 ## GUI Authentication (Railway MySQL)
@@ -305,23 +310,31 @@ scripts/
 - `material`: перевод материалов из `source language` в выбранный язык или сразу во все target-языки.
 - `color`: перевод цвета RU -> EN по словарю в выбранный target-язык или сразу во все.
 - `height`:
-  - `spec_id=754`, `722`, `721`, `720` (регулируемая высота и вылет от места крепления)
+  - `spec_id=754`, `722`, `721`, `720`, `762`, `760`, `68` (регулируемая высота, вылет, габариты в сборе/индивидуальной/групповой упаковки)
   - для `language_id=2` (US): конвертация `mm -> inch` по коэффициенту `MM_TO_INCH_FACTOR` с дробями (`¼`, `½`, `¾`)
+  - для размерных пунктов (`68`, `760`, `762`) нормализуется формат `A x B x C` (пробелы вокруг `x`)
   - для `language_id=3..8`: перенос исходного значения без конвертации
 - `load`:
-  - `spec_id=23` и `spec_id=786`
-  - для `language_id=2` (US): конвертация `kg -> lbs` с красивыми дробями (`¼`, `½`, `¾`)
+  - `spec_id=23`, `786`, `766`, `767`: для `language_id=2` (US) конвертация `kg -> lbs` с красивыми дробями (`¼`, `½`, `¾`)
+  - `spec_id=763`: для `language_id=2` (US) конвертация `m3 -> ft3` по коэффициенту `M3_TO_FT3_FACTOR`
+    - точность настраивается через `VOLUME_FT3_DECIMALS` (по умолчанию `6`)
+    - если исходное число выглядит как "сырое" большое значение (например `188700`), оно сначала нормализуется в `m3` по `VOLUME_RAW_TO_M3_THRESHOLD/VOLUME_RAW_TO_M3_DIVISOR`
   - для `language_id=3..8`: перенос исходных чисел без конвертации
 - `autofill`: прямое копирование значения спецификаций без трансформации из `source language` в target-языки по массиву `SPEC_IDS_AUTOFILL`.
 - `manual transfer` (в GUI):
   - источник фиксирован на `language_id=1` (переопределяется через `TRANSFER_SOURCE_LANGUAGE_ID`)
   - выбор одного продукта
+  - карточки продуктов включают превью из `products.products_image`
   - отображение текстовых значений по доступным `spec_id`
   - чекбоксы для выбора пунктов
-  - для `spec_id=23`, `786`, `754`, `722`, `721`, `720`: конвертация только при `language_id=2` (US), иначе прямой перенос
+  - для `spec_id=23`, `786`, `766`, `767`: конвертация только при `language_id=2` (US), `kg -> lbs`
+  - для `spec_id=754`, `722`, `721`, `720`, `762`, `760`, `68`: конвертация только при `language_id=2` (US), `mm -> inches` (дроби `¼`, `½`, `¾`)
+  - для размерных пунктов (`68`, `760`, `762`) нормализуется формат `A x B x C` (пробелы вокруг `x`)
+  - для `spec_id=763`: конвертация только при `language_id=2` (US), `m3 -> ft3` с точностью `VOLUME_FT3_DECIMALS`
   - перенос отмеченных пунктов в выбранный target-язык или `all`
 - Bitrix logging (опционально):
   - отправка сводных логов при реальной записи (`dry-run=false` и `updated > 0`)
+  - для ручного переноса в лог добавляется `productId` и `productName`
   - каналы: `gui-task`, `gui-transfer`, `cli-task`
 
 По умолчанию `SPEC_IDS_AUTOFILL`:
