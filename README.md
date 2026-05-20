@@ -91,6 +91,7 @@ CREATE TABLE auth_users (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  role ENUM('user', 'advanced', 'admin') NOT NULL DEFAULT 'user',
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -118,13 +119,21 @@ VALUES ('admin', '$2b$12$...');
 Or run directly from terminal:
 
 ```bash
-npm run auth:create-user -- admin "StrongPassword123!"
+npm run auth:create-user -- admin "StrongPassword123!" admin
+npm run auth:create-user -- manager "StrongPassword123!" user
+npm run auth:create-user -- lead "StrongPassword123!" advanced
 ```
 
 Reset password:
 
 ```bash
 npm run auth:reset-password -- admin "NewStrongPassword456!"
+```
+
+Change role:
+
+```bash
+npm run auth:set-role -- manager advanced
 ```
 
 Disable user:
@@ -137,6 +146,104 @@ Notes:
 - Use only hashed passwords (`bcrypt`), never plaintext.
 - `AUTH_DB_URL` has priority over separate `AUTH_DB_HOST/AUTH_DB_USER/...`.
 - If `AUTH_REQUIRED=0`, GUI works in local mode without login.
+- Roles: `user` can transfer/edit product specs, `advanced` can also run bulk task blocks, `admin` has all advanced permissions.
+
+If the table already exists without `role`, add it:
+
+```sql
+ALTER TABLE auth_users
+  ADD COLUMN role ENUM('user', 'advanced', 'admin') NOT NULL DEFAULT 'user'
+  AFTER password_hash;
+```
+
+## Railway API mode for distributed `.app/.dmg`
+
+For sharing the desktop app with other users, do not ship `.env` or DB passwords inside Electron.
+Run the backend API on Railway and put all secrets there. The packaged app only needs the public API URL.
+
+### 1. Railway service
+
+Use this start command:
+
+```bash
+npm run server
+```
+
+Set Railway variables:
+
+```env
+PORT=3000
+API_SESSION_SECRET=generate-long-random-string
+AUTH_REQUIRED=1
+AUTH_DB_URL=mysql://user:pass@host:3306/auth_db
+
+host=shop-db-host
+user=shop-db-user
+database=shop-db-name
+password=shop-db-password
+
+TRANSFER_SOURCE_LANGUAGE_ID=1
+PRODUCT_IMAGE_BASE_URL=https://shop.onkron.ru/images/product_images/info_images
+BITRIX_WEBHOOK_BASE_URL=https://your-company.bitrix24.ru/rest/<user_id>/<webhook_token>
+BITRIX_DIALOG_ID=chat101362
+```
+
+Also keep the needed `SPEC_*` and conversion variables on Railway if you override defaults.
+
+Health check:
+
+```bash
+curl https://your-railway-api.up.railway.app/health
+```
+
+Expected response:
+
+```json
+{"ok":true}
+```
+
+Public download page:
+
+```text
+https://your-railway-api.up.railway.app/
+```
+
+Download buttons can redirect to external files:
+
+```env
+DOWNLOAD_MACOS_URL=https://example.com/VamShop-Spec-GUI-mac.dmg
+DOWNLOAD_WINDOWS_URL=https://example.com/VamShop-Spec-GUI-win.exe
+```
+
+Or serve files from the server filesystem:
+
+```env
+DOWNLOAD_RELEASE_DIR=/app/release
+DOWNLOAD_MACOS_FILE=/app/release/VamShop-Spec-GUI-mac.dmg
+DOWNLOAD_WINDOWS_FILE=/app/release/VamShop-Spec-GUI-win.exe
+```
+
+If explicit files are not set, the API tries to find the newest `.dmg`/`.zip` for macOS and `.exe`/`.msi` for Windows inside `DOWNLOAD_RELEASE_DIR` or `release/`.
+
+### 2. Local app config before building
+
+Create `electron/app-config.json` locally:
+
+```json
+{
+  "apiBaseUrl": "https://your-railway-api.up.railway.app"
+}
+```
+
+This file is ignored by git and can be included into the local packaged build.
+
+### 3. Build installer
+
+```bash
+npm run dist:mac:unsigned
+```
+
+The `.dmg` will be created in `release/`. In API mode Electron sends auth, tasks, transfer and editor requests to Railway instead of using local DB credentials.
 
 ## Запуск GUI (Electron)
 
@@ -178,10 +285,12 @@ node dist/cli.js run all --material-lang all --target-lang all --dry-run
 ```bash
 npm run gui
 npm run gui:dev
+npm run server
 npm run auth:hash -- "StrongPassword123!"
 npm run auth:init-table
 npm run auth:create-user -- admin "StrongPassword123!"
 npm run auth:reset-password -- admin "NewStrongPassword456!"
+npm run auth:set-role -- admin advanced
 npm run auth:disable-user -- admin
 npm run icons:build
 npm run pack

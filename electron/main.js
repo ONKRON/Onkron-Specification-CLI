@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const dotenv = require("dotenv");
 const { app, BrowserWindow, ipcMain, nativeImage } = require("electron");
 const { COUNTRY_BY_LANGUAGE_ID } = require("../dist/config/specs");
 const { runTask, getRunPlan } = require("../dist/cli");
@@ -12,11 +13,64 @@ const {
 } = require("../dist/lib/transfer");
 const { sendBitrixChangeLog } = require("../dist/lib/bitrixLogger");
 const { isAuthRequired, authenticate } = require("./auth");
+const { createApiClient } = require("./apiClient");
+
+dotenv.config();
+
 const ALL_TARGETS = "all";
 const TRANSFER_SOURCE_LANGUAGE_ID = Number(
   process.env.TRANSFER_SOURCE_LANGUAGE_ID || 1
 );
+const apiBaseUrl = resolveApiBaseUrl();
+const apiClient = apiBaseUrl ? createApiClient({ baseUrl: apiBaseUrl }) : null;
+let apiAuthRequired = true;
 let sessionUser = null;
+
+function readJsonConfig(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveApiBaseUrl() {
+  const fromEnv = String(
+    process.env.API_BASE_URL || process.env.VAMSHOP_API_BASE_URL || ""
+  ).trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  const candidates = [
+    process.env.VAMSHOP_CONFIG_PATH,
+    path.join(__dirname, "app-config.json"),
+    process.resourcesPath
+      ? path.join(process.resourcesPath, "app-config.json")
+      : "",
+    path.join(path.dirname(process.execPath), "app-config.json"),
+  ];
+
+  for (const candidate of candidates) {
+    const config = readJsonConfig(candidate);
+    const configuredUrl = String(
+      config?.apiBaseUrl || config?.API_BASE_URL || ""
+    ).trim();
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+  }
+
+  return "";
+}
+
+function isApiMode() {
+  return Boolean(apiClient);
+}
 
 function resolveIconPath() {
   const candidates = [
@@ -59,6 +113,16 @@ function resolveIconPath() {
 const appIconPath = resolveIconPath();
 
 function getSessionState() {
+  if (isApiMode()) {
+    return {
+      required: apiAuthRequired,
+      authenticated: !apiAuthRequired || Boolean(sessionUser),
+      user: !apiAuthRequired
+        ? { id: 0, username: "api", role: "admin" }
+        : sessionUser,
+    };
+  }
+
   const required = isAuthRequired();
   if (!required) {
     return {
@@ -143,26 +207,71 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 }
 
-ipcMain.handle("spec:get-countries", async () => COUNTRY_BY_LANGUAGE_ID);
+ipcMain.handle("spec:get-countries", async () => {
+  if (isApiMode()) {
+    return apiClient.getCountries();
+  }
 
-ipcMain.handle("spec:auth:get-config", async () => ({
-  required: isAuthRequired(),
-}));
+  return COUNTRY_BY_LANGUAGE_ID;
+});
 
-ipcMain.handle("spec:auth:get-session", async () => getSessionState());
+ipcMain.handle("spec:auth:get-config", async () => {
+  if (isApiMode()) {
+    const config = await apiClient.getAuthConfig();
+    apiAuthRequired = Boolean(config?.required);
+    return config;
+  }
+
+  return {
+    required: isAuthRequired(),
+  };
+});
+
+ipcMain.handle("spec:auth:get-session", async () => {
+  if (isApiMode()) {
+    return getSessionState();
+  }
+
+  return getSessionState();
+});
 
 ipcMain.handle("spec:auth:login", async (_event, credentials) => {
+  if (isApiMode()) {
+    const session = await apiClient.login(credentials);
+    apiAuthRequired = Boolean(session?.required);
+    sessionUser = session?.user || null;
+    return getSessionState();
+  }
+
   const user = await authenticate(credentials);
   sessionUser = user;
   return getSessionState();
 });
 
 ipcMain.handle("spec:auth:logout", async () => {
+  if (isApiMode()) {
+    const session = await apiClient.logout();
+    apiAuthRequired = Boolean(session?.required);
+    sessionUser = null;
+    return getSessionState();
+  }
+
   sessionUser = null;
   return getSessionState();
 });
 
 ipcMain.handle("spec:run-task", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.runTask(payload || {}, {
+      onProgressPlan: (progressPlan) => {
+        _event.sender.send("spec:progress-plan", progressPlan);
+      },
+      onProgress: (progress) => {
+        _event.sender.send("spec:progress", progress);
+      },
+    });
+  }
+
   ensureAdvancedAccess();
 
   const {
@@ -239,6 +348,10 @@ ipcMain.handle("spec:run-task", async (_event, payload) => {
 });
 
 ipcMain.handle("spec:transfer:list-products", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.listTransferProducts(payload || {});
+  }
+
   ensureAuthenticated();
 
   const {
@@ -257,6 +370,10 @@ ipcMain.handle("spec:transfer:list-products", async (_event, payload) => {
 });
 
 ipcMain.handle("spec:transfer:get-product-specs", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.getTransferProductSpecs(payload || {});
+  }
+
   ensureAuthenticated();
 
   const {
@@ -278,6 +395,10 @@ ipcMain.handle("spec:transfer:get-product-specs", async (_event, payload) => {
 });
 
 ipcMain.handle("spec:editor:get-product-specs", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.getEditableProductSpecs(payload || {});
+  }
+
   ensureAuthenticated();
 
   const {
@@ -305,6 +426,10 @@ ipcMain.handle("spec:editor:get-product-specs", async (_event, payload) => {
 });
 
 ipcMain.handle("spec:editor:save-product-specs", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.saveEditableProductSpecs(payload || {});
+  }
+
   ensureAuthenticated();
 
   const {
@@ -344,6 +469,14 @@ ipcMain.handle("spec:editor:save-product-specs", async (_event, payload) => {
 });
 
 ipcMain.handle("spec:transfer:submit", async (_event, payload) => {
+  if (isApiMode()) {
+    return apiClient.submitTransfer(payload || {}, {
+      onProgress: (progress) => {
+        _event.sender.send("spec:progress", progress);
+      },
+    });
+  }
+
   ensureAuthenticated();
 
   const {

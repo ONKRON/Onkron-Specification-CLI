@@ -12,6 +12,8 @@
     "dev": "nodemon ./dist/cli.js",
     "gui": "electron ./electron/main.js",
     "gui:dev": "electron ./electron/main.js --enable-logging",
+    "server": "node ./server/index.js",
+    "api": "node ./server/index.js",
     "auth:hash": "node ./scripts/hash-password.js",
     "auth:init-table": "node ./scripts/auth-admin.js init-table",
     "auth:create-user": "node ./scripts/auth-admin.js create-user",

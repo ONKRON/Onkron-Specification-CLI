@@ -1,7 +1,7 @@
 *node_modules/*
 .env*
 !.env.signing.example
-release/
+electron/app-config.json
 dist/mac-arm64/
 *.log
 .DS_Store
