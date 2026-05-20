@@ -332,10 +332,10 @@ function isDownloadAvailable(platform) {
 }
 
 function renderLandingPage() {
-  const title = String(process.env.LANDING_TITLE || "VamShop Specification GUI");
+  const title = String(process.env.LANDING_TITLE || "VamShop Spec");
   const subtitle = String(
     process.env.LANDING_SUBTITLE ||
-      "Desktop-приложение для безопасной работы со спецификациями товаров VamShop."
+      "Внутреннее desktop-приложение для безопасного переноса, редактирования и проверки спецификаций товаров."
   );
   const macAvailable = isDownloadAvailable("macos");
   const windowsAvailable = isDownloadAvailable("windows");
@@ -399,7 +399,7 @@ function renderLandingPage() {
     }
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1.06fr) minmax(340px, 0.94fr);
+      grid-template-columns: minmax(0, 0.98fr) minmax(360px, 1.02fr);
       gap: 24px;
       align-items: stretch;
     }
@@ -415,12 +415,12 @@ function renderLandingPage() {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 580px;
+      min-height: 560px;
     }
     .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       color: var(--muted);
       font-weight: 800;
       letter-spacing: 0.08em;
@@ -429,25 +429,52 @@ function renderLandingPage() {
     }
     .eyebrow::before {
       content: "";
-      width: 12px;
-      height: 12px;
+      width: 34px;
+      height: 14px;
+      flex: 0 0 auto;
       border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 18px 0 0 var(--teal);
+      background:
+        radial-gradient(circle at 7px 50%, var(--accent) 0 6px, transparent 6.5px),
+        radial-gradient(circle at 26px 50%, var(--teal) 0 6px, transparent 6.5px);
     }
     h1 {
-      margin: 38px 0 22px;
-      max-width: 650px;
-      font-size: clamp(48px, 6.2vw, 76px);
-      line-height: 0.94;
-      letter-spacing: -0.065em;
+      margin: 42px 0 22px;
+      max-width: 600px;
+      font-size: clamp(54px, 6vw, 82px);
+      line-height: 0.9;
+      letter-spacing: -0.07em;
     }
     p {
       margin: 0;
       color: var(--muted);
-      max-width: 610px;
-      font-size: clamp(18px, 2vw, 22px);
-      line-height: 1.45;
+      max-width: 560px;
+      font-size: clamp(18px, 1.8vw, 21px);
+      line-height: 1.48;
+    }
+    .lead {
+      display: grid;
+      gap: 18px;
+      margin-top: 28px;
+      max-width: 570px;
+    }
+    .lead-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      color: #40392f;
+      font-size: 16px;
+      line-height: 1.34;
+      font-weight: 800;
+    }
+    .lead-item::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 5px rgba(36, 118, 124, 0.12);
     }
     .actions {
       display: flex;
@@ -572,6 +599,7 @@ function renderLandingPage() {
       .hero { grid-template-columns: 1fr; }
       .panel { border-radius: 26px; }
       .intro { min-height: auto; }
+      h1 { font-size: clamp(44px, 13vw, 62px); }
       .button { width: 100%; }
     }
   </style>
@@ -584,6 +612,10 @@ function renderLandingPage() {
           <div class="eyebrow">ONKRON internal tool</div>
           <h1>${escapeHtml(title)}</h1>
           <p>${escapeHtml(subtitle)}</p>
+          <div class="lead" aria-label="Ключевые преимущества">
+            <div class="lead-item">Безопасный доступ через Railway API без передачи паролей от базы.</div>
+            <div class="lead-item">Единое приложение для переноса, ручного ввода и массовых задач.</div>
+          </div>
         </div>
         <div>
           <div class="actions">
