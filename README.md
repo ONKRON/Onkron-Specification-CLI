@@ -169,6 +169,8 @@ Use this start command:
 npm run server
 ```
 
+The repository also contains `railway.toml`, so Railway should use this command automatically after redeploy.
+
 Set Railway variables:
 
 ```env
