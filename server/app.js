@@ -30,6 +30,7 @@ const RELEASE_DIR = path.resolve(
   process.env.DOWNLOAD_RELEASE_DIR || path.join(__dirname, "..", "release")
 );
 const WEB_APP_DIR = path.join(__dirname, "..", "electron", "renderer");
+const ICONS_DIR = path.join(__dirname, "..", "build", "icons");
 
 function normalizeLanguageInput(value, fallback, { allowAll = false } = {}) {
   if (value === undefined || value === null || value === "") {
@@ -284,6 +285,16 @@ function handleWebAppAsset(res, pathname) {
       file: path.join(WEB_APP_DIR, "renderer.js"),
       contentType: "application/javascript; charset=utf-8",
       cache: "no-store",
+    },
+    "/favicon.ico": {
+      file: path.join(ICONS_DIR, "icon.ico"),
+      contentType: "image/x-icon",
+      cache: "public, max-age=86400",
+    },
+    "/favicon.png": {
+      file: path.join(ICONS_DIR, "icon.png"),
+      contentType: "image/png",
+      cache: "public, max-age=86400",
     },
   };
 
