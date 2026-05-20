@@ -29,6 +29,7 @@ const SESSION_SECRET =
 const RELEASE_DIR = path.resolve(
   process.env.DOWNLOAD_RELEASE_DIR || path.join(__dirname, "..", "release")
 );
+const WEB_APP_DIR = path.join(__dirname, "..", "electron", "renderer");
 
 function normalizeLanguageInput(value, fallback, { allowAll = false } = {}) {
   if (value === undefined || value === null || value === "") {
@@ -190,6 +191,22 @@ function sendHtml(res, statusCode, html) {
   res.end(html);
 }
 
+function sendFile(res, filePath, contentType, { cache = "public, max-age=300" } = {}) {
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    sendJson(res, 404, { error: "Файл не найден" });
+    return;
+  }
+
+  const stat = fs.statSync(filePath);
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Content-Length": stat.size,
+    "Cache-Control": cache,
+    "X-Content-Type-Options": "nosniff",
+  });
+  fs.createReadStream(filePath).pipe(res);
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -240,6 +257,43 @@ function validateLanguageId(value) {
     throw new Error("Нужен корректный languageId");
   }
   return languageId;
+}
+
+function handleWebAppAsset(res, pathname) {
+  const assets = {
+    "/app": {
+      file: path.join(WEB_APP_DIR, "index.html"),
+      contentType: "text/html; charset=utf-8",
+      cache: "no-store",
+    },
+    "/app/": {
+      file: path.join(WEB_APP_DIR, "index.html"),
+      contentType: "text/html; charset=utf-8",
+      cache: "no-store",
+    },
+    "/app/styles.css": {
+      file: path.join(WEB_APP_DIR, "styles.css"),
+      contentType: "text/css; charset=utf-8",
+    },
+    "/app/web-api.js": {
+      file: path.join(WEB_APP_DIR, "web-api.js"),
+      contentType: "application/javascript; charset=utf-8",
+      cache: "no-store",
+    },
+    "/app/renderer.js": {
+      file: path.join(WEB_APP_DIR, "renderer.js"),
+      contentType: "application/javascript; charset=utf-8",
+      cache: "no-store",
+    },
+  };
+
+  const asset = assets[pathname];
+  if (!asset) {
+    return false;
+  }
+
+  sendFile(res, asset.file, asset.contentType, { cache: asset.cache });
+  return true;
 }
 
 function getDownloadUrl(platform) {
@@ -592,6 +646,7 @@ function renderLandingPage() {
         </div>
         <div>
           <div class="actions">
+            <a class="button secondary" href="/app"><span>Открыть веб-версию</span></a>
             ${macButton}
             ${windowsButton}
           </div>
@@ -768,6 +823,10 @@ async function handleRoute(req, res) {
 
   if (method === "GET" && pathname === "/") {
     sendHtml(res, 200, renderLandingPage());
+    return;
+  }
+
+  if (method === "GET" && handleWebAppAsset(res, pathname)) {
     return;
   }
 

@@ -210,6 +210,14 @@ Public download page:
 https://your-railway-api.up.railway.app/
 ```
 
+Web application:
+
+```text
+https://your-railway-api.up.railway.app/app
+```
+
+The web UI uses the same auth, roles, task, transfer and editor API routes as the Electron app.
+
 Download buttons can redirect to external files:
 
 ```env
