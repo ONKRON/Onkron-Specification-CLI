@@ -819,14 +819,24 @@ async function transferSubmitAction(body, user, progressHandlers = {}) {
 async function handleRoute(req, res) {
   const parsedUrl = new URL(req.url, "http://localhost");
   const method = req.method || "GET";
-  const pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
+  const rawPathname = parsedUrl.pathname;
+  const pathname = rawPathname.replace(/\/+$/, "") || "/";
 
   if (method === "GET" && pathname === "/") {
     sendHtml(res, 200, renderLandingPage());
     return;
   }
 
-  if (method === "GET" && handleWebAppAsset(res, pathname)) {
+  if (method === "GET" && rawPathname === "/app") {
+    res.writeHead(302, {
+      Location: "/app/",
+      "Cache-Control": "no-store",
+    });
+    res.end();
+    return;
+  }
+
+  if (method === "GET" && handleWebAppAsset(res, rawPathname)) {
     return;
   }
 
