@@ -451,34 +451,9 @@ function renderLandingPage() {
       font-size: clamp(18px, 1.8vw, 21px);
       line-height: 1.48;
     }
-    .lead {
-      display: grid;
-      gap: 18px;
-      margin-top: 28px;
-      max-width: 570px;
-    }
-    .lead-item {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      color: #40392f;
-      font-size: 16px;
-      line-height: 1.34;
-      font-weight: 800;
-    }
-    .lead-item::before {
-      content: "";
-      width: 9px;
-      height: 9px;
-      flex: 0 0 auto;
-      margin-top: 7px;
-      border-radius: 50%;
-      background: var(--teal);
-      box-shadow: 0 0 0 5px rgba(36, 118, 124, 0.12);
-    }
     .actions {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 12px;
       margin-top: 42px;
     }
@@ -488,7 +463,8 @@ function renderLandingPage() {
       justify-content: center;
       gap: 10px;
       min-height: 54px;
-      min-width: 190px;
+      min-width: 0;
+      flex: 1 1 0;
       padding: 0 22px;
       border-radius: 16px;
       color: #fff;
@@ -600,6 +576,7 @@ function renderLandingPage() {
       .panel { border-radius: 26px; }
       .intro { min-height: auto; }
       h1 { font-size: clamp(44px, 13vw, 62px); }
+      .actions { flex-direction: column; }
       .button { width: 100%; }
     }
   </style>
@@ -612,10 +589,6 @@ function renderLandingPage() {
           <div class="eyebrow">ONKRON internal tool</div>
           <h1>${escapeHtml(title)}</h1>
           <p>${escapeHtml(subtitle)}</p>
-          <div class="lead" aria-label="Ключевые преимущества">
-            <div class="lead-item">Безопасный доступ через Railway API без передачи паролей от базы.</div>
-            <div class="lead-item">Единое приложение для переноса, ручного ввода и массовых задач.</div>
-          </div>
         </div>
         <div>
           <div class="actions">
