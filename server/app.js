@@ -17,17 +17,19 @@ const { sendBitrixChangeLog } = require("../dist/lib/bitrixLogger");
 const { isAuthRequired, authenticate } = require("../electron/auth");
 
 const ALL_TARGETS = "all";
-const TRANSFER_SOURCE_LANGUAGE_ID = Number(process.env.TRANSFER_SOURCE_LANGUAGE_ID || 1);
+const TRANSFER_SOURCE_LANGUAGE_ID = Number(
+  process.env.TRANSFER_SOURCE_LANGUAGE_ID || 1,
+);
 const TOKEN_TTL_SECONDS = Math.max(
   300,
-  Number(process.env.API_SESSION_TTL_SECONDS || 60 * 60 * 12)
+  Number(process.env.API_SESSION_TTL_SECONDS || 60 * 60 * 12),
 );
 const SESSION_SECRET =
   process.env.API_SESSION_SECRET ||
   process.env.AUTH_SESSION_SECRET ||
   crypto.randomBytes(32).toString("hex");
 const RELEASE_DIR = path.resolve(
-  process.env.DOWNLOAD_RELEASE_DIR || path.join(__dirname, "..", "release")
+  process.env.DOWNLOAD_RELEASE_DIR || path.join(__dirname, "..", "release"),
 );
 const WEB_APP_DIR = path.join(__dirname, "..", "electron", "renderer");
 const ICONS_DIR = path.join(__dirname, "..", "build", "icons");
@@ -58,7 +60,9 @@ function normalizeLanguageInput(value, fallback, { allowAll = false } = {}) {
 }
 
 function hasAdvancedAccess(user) {
-  const role = String(user?.role || "user").trim().toLowerCase();
+  const role = String(user?.role || "user")
+    .trim()
+    .toLowerCase();
   return role === "advanced" || role === "admin";
 }
 
@@ -67,11 +71,16 @@ function base64UrlEncode(value) {
 }
 
 function base64UrlDecode(value) {
-  return JSON.parse(Buffer.from(String(value || ""), "base64url").toString("utf8"));
+  return JSON.parse(
+    Buffer.from(String(value || ""), "base64url").toString("utf8"),
+  );
 }
 
 function signPayload(payloadPart) {
-  return crypto.createHmac("sha256", SESSION_SECRET).update(payloadPart).digest("base64url");
+  return crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(payloadPart)
+    .digest("base64url");
 }
 
 function createToken(user) {
@@ -100,7 +109,11 @@ function verifyToken(token) {
   }
 
   const payload = base64UrlDecode(payloadPart);
-  if (!payload?.user || !payload?.exp || Number(payload.exp) < Math.floor(Date.now() / 1000)) {
+  if (
+    !payload?.user ||
+    !payload?.exp ||
+    Number(payload.exp) < Math.floor(Date.now() / 1000)
+  ) {
     return null;
   }
 
@@ -147,7 +160,9 @@ function getRequestUser(req) {
 
 function ensureAdvanced(user) {
   if (!hasAdvancedAccess(user)) {
-    const error = new Error("Недостаточно прав. Нужна роль advanced или admin.");
+    const error = new Error(
+      "Недостаточно прав. Нужна роль advanced или admin.",
+    );
     error.statusCode = 403;
     throw error;
   }
@@ -192,7 +207,12 @@ function sendHtml(res, statusCode, html) {
   res.end(html);
 }
 
-function sendFile(res, filePath, contentType, { cache = "public, max-age=300" } = {}) {
+function sendFile(
+  res,
+  filePath,
+  contentType,
+  { cache = "public, max-age=300" } = {},
+) {
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     sendJson(res, 404, { error: "Файл не найден" });
     return;
@@ -310,15 +330,17 @@ function handleWebAppAsset(res, pathname) {
 function getDownloadUrl(platform) {
   if (platform === "macos") {
     return (
-      String(process.env.DOWNLOAD_MACOS_URL || process.env.DOWNLOAD_MAC_URL || "").trim() ||
-      getGitHubReleaseDownloadUrl(platform)
+      String(
+        process.env.DOWNLOAD_MACOS_URL || process.env.DOWNLOAD_MAC_URL || "",
+      ).trim() || getGitHubReleaseDownloadUrl(platform)
     );
   }
 
   if (platform === "windows") {
     return (
-      String(process.env.DOWNLOAD_WINDOWS_URL || process.env.DOWNLOAD_WIN_URL || "").trim() ||
-      getGitHubReleaseDownloadUrl(platform)
+      String(
+        process.env.DOWNLOAD_WINDOWS_URL || process.env.DOWNLOAD_WIN_URL || "",
+      ).trim() || getGitHubReleaseDownloadUrl(platform)
     );
   }
 
@@ -337,7 +359,7 @@ function getGitHubReleaseDownloadUrl(platform) {
   const repository = String(
     process.env.DOWNLOAD_GITHUB_REPOSITORY ||
       process.env.GITHUB_REPOSITORY ||
-      "webobscure/Onkron-Specification-CLI"
+      "webobscure/Onkron-Specification-CLI",
   ).trim();
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
     return "";
@@ -348,7 +370,7 @@ function getGitHubReleaseDownloadUrl(platform) {
       ? process.env.DOWNLOAD_MACOS_ASSET_NAME ||
           `VamShop Spec GUI-${packageJson.version}-mac.dmg`
       : process.env.DOWNLOAD_WINDOWS_ASSET_NAME ||
-          `VamShop Spec GUI-${packageJson.version}-win.exe`
+          `VamShop Spec GUI-${packageJson.version}-win.exe`,
   ).trim();
   if (!assetName) {
     return "";
@@ -367,7 +389,9 @@ function getDownloadFile(platform) {
   const explicitPath = String(
     platform === "macos"
       ? process.env.DOWNLOAD_MACOS_FILE || process.env.DOWNLOAD_MAC_FILE || ""
-      : process.env.DOWNLOAD_WINDOWS_FILE || process.env.DOWNLOAD_WIN_FILE || ""
+      : process.env.DOWNLOAD_WINDOWS_FILE ||
+          process.env.DOWNLOAD_WIN_FILE ||
+          "",
   ).trim();
 
   if (explicitPath && fs.existsSync(explicitPath)) {
@@ -379,7 +403,9 @@ function getDownloadFile(platform) {
   }
 
   const allowedExtensions =
-    platform === "macos" ? new Set([".dmg", ".zip"]) : new Set([".exe", ".msi"]);
+    platform === "macos"
+      ? new Set([".dmg", ".zip"])
+      : new Set([".exe", ".msi"]);
   const files = fs
     .readdirSync(RELEASE_DIR)
     .map((fileName) => path.join(RELEASE_DIR, fileName))
@@ -387,7 +413,9 @@ function getDownloadFile(platform) {
       const extension = path.extname(filePath).toLowerCase();
       return allowedExtensions.has(extension) && fs.statSync(filePath).isFile();
     })
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+    .sort(
+      (left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs,
+    );
 
   return files[0] || "";
 }
@@ -400,7 +428,7 @@ function renderLandingPage() {
   const title = String(process.env.LANDING_TITLE || "VamShop Spec");
   const subtitle = String(
     process.env.LANDING_SUBTITLE ||
-      "Внутреннее desktop-приложение для безопасного переноса, редактирования и проверки спецификаций товаров."
+      "Внутреннее desktop-приложение для безопасного переноса, редактирования и проверки спецификаций товаров.",
   );
   const macAvailable = isDownloadAvailable("macos");
   const windowsAvailable = isDownloadAvailable("windows");
@@ -411,7 +439,9 @@ function renderLandingPage() {
     "Авторизация, роли пользователей и защищенный запуск массовых задач.",
     "Логи операций в Bitrix24 и прогресс выполнения долгих задач.",
   ];
-  const featureItems = features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("");
+  const featureItems = features
+    .map((feature) => `<li>${escapeHtml(feature)}</li>`)
+    .join("");
   const downloadNote =
     macAvailable || windowsAvailable
       ? "Выберите платформу и скачайте актуальную сборку приложения."
@@ -464,7 +494,7 @@ function renderLandingPage() {
     }
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 0.98fr) minmax(360px, 1.02fr);
+      grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
       gap: 24px;
       align-items: stretch;
     }
@@ -707,7 +737,7 @@ function handleDownload(res, platform) {
     sendHtml(
       res,
       404,
-      "<!doctype html><meta charset=\"utf-8\"><title>Сборка не найдена</title><body>Файл сборки пока не подключен.</body>"
+      '<!doctype html><meta charset="utf-8"><title>Сборка не найдена</title><body>Файл сборки пока не подключен.</body>',
     );
     return;
   }
@@ -741,8 +771,14 @@ async function runTaskAction(body, user, progressHandlers = {}) {
 
   const flags = {
     sourceLanguageId: normalizeLanguageInput(sourceLanguageId, 1),
-    targetLanguageId: normalizeLanguageInput(targetLanguageId, ALL_TARGETS, { allowAll: true }),
-    materialLanguageId: normalizeLanguageInput(materialLanguageId, ALL_TARGETS, { allowAll: true }),
+    targetLanguageId: normalizeLanguageInput(targetLanguageId, ALL_TARGETS, {
+      allowAll: true,
+    }),
+    materialLanguageId: normalizeLanguageInput(
+      materialLanguageId,
+      ALL_TARGETS,
+      { allowAll: true },
+    ),
     dryRun: Boolean(dryRun),
   };
   const plan = getRunPlan(task, flags);
@@ -801,12 +837,19 @@ async function transferSubmitAction(body, user, progressHandlers = {}) {
   const result = await transferSelectedProductSpecifications({
     productId,
     sourceLanguageId: normalizeLanguageInput(TRANSFER_SOURCE_LANGUAGE_ID, 1),
-    targetLanguageId: normalizeLanguageInput(body?.targetLanguageId || ALL_TARGETS, ALL_TARGETS, {
-      allowAll: true,
-    }),
-    specIds: Array.isArray(body?.specIds) ? body.specIds.map((id) => Number(id)) : [],
+    targetLanguageId: normalizeLanguageInput(
+      body?.targetLanguageId || ALL_TARGETS,
+      ALL_TARGETS,
+      {
+        allowAll: true,
+      },
+    ),
+    specIds: Array.isArray(body?.specIds)
+      ? body.specIds.map((id) => Number(id))
+      : [],
     dryRun: Boolean(body?.dryRun),
-    onProgress: (progress) => progressHandlers.onProgress?.({ type: "transfer", ...progress }),
+    onProgress: (progress) =>
+      progressHandlers.onProgress?.({ type: "transfer", ...progress }),
   });
 
   void sendBitrixChangeLog({
@@ -903,12 +946,15 @@ async function handleRoute(req, res) {
       initNdjson(res);
       try {
         const result = await runTaskAction(body, user, {
-          onProgressPlan: (payload) => writeNdjson(res, "progress-plan", payload),
+          onProgressPlan: (payload) =>
+            writeNdjson(res, "progress-plan", payload),
           onProgress: (payload) => writeNdjson(res, "progress", payload),
         });
         writeNdjson(res, "result", result);
       } catch (error) {
-        writeNdjson(res, "error", { message: error?.message || "Ошибка запуска задачи" });
+        writeNdjson(res, "error", {
+          message: error?.message || "Ошибка запуска задачи",
+        });
       }
       res.end();
       return;
@@ -924,10 +970,13 @@ async function handleRoute(req, res) {
       res,
       200,
       await listTransferProducts({
-        sourceLanguageId: normalizeLanguageInput(TRANSFER_SOURCE_LANGUAGE_ID, 1),
+        sourceLanguageId: normalizeLanguageInput(
+          TRANSFER_SOURCE_LANGUAGE_ID,
+          1,
+        ),
         search: String(body?.search || ""),
         limit: Number(body?.limit) || 120,
-      })
+      }),
     );
     return;
   }
@@ -938,9 +987,12 @@ async function handleRoute(req, res) {
       res,
       200,
       await getTransferProductSpecifications({
-        sourceLanguageId: normalizeLanguageInput(TRANSFER_SOURCE_LANGUAGE_ID, 1),
+        sourceLanguageId: normalizeLanguageInput(
+          TRANSFER_SOURCE_LANGUAGE_ID,
+          1,
+        ),
         productId: validateProductId(body?.productId),
-      })
+      }),
     );
     return;
   }
@@ -951,10 +1003,13 @@ async function handleRoute(req, res) {
       res,
       200,
       await getEditableProductSpecifications({
-        sourceLanguageId: normalizeLanguageInput(TRANSFER_SOURCE_LANGUAGE_ID, 1),
+        sourceLanguageId: normalizeLanguageInput(
+          TRANSFER_SOURCE_LANGUAGE_ID,
+          1,
+        ),
         languageId: validateLanguageId(body?.languageId),
         productId: validateProductId(body?.productId),
-      })
+      }),
     );
     return;
   }
@@ -995,7 +1050,9 @@ async function handleRoute(req, res) {
         });
         writeNdjson(res, "result", result);
       } catch (error) {
-        writeNdjson(res, "error", { message: error?.message || "Ошибка переноса" });
+        writeNdjson(res, "error", {
+          message: error?.message || "Ошибка переноса",
+        });
       }
       res.end();
       return;
