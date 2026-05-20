@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
+const packageJson = require("../package.json");
 const { COUNTRY_BY_LANGUAGE_ID } = require("../dist/config/specs");
 const { runTask, getRunPlan } = require("../dist/cli");
 const {
@@ -243,14 +244,58 @@ function validateLanguageId(value) {
 
 function getDownloadUrl(platform) {
   if (platform === "macos") {
-    return String(process.env.DOWNLOAD_MACOS_URL || process.env.DOWNLOAD_MAC_URL || "").trim();
+    return (
+      String(process.env.DOWNLOAD_MACOS_URL || process.env.DOWNLOAD_MAC_URL || "").trim() ||
+      getGitHubReleaseDownloadUrl(platform)
+    );
   }
 
   if (platform === "windows") {
-    return String(process.env.DOWNLOAD_WINDOWS_URL || process.env.DOWNLOAD_WIN_URL || "").trim();
+    return (
+      String(process.env.DOWNLOAD_WINDOWS_URL || process.env.DOWNLOAD_WIN_URL || "").trim() ||
+      getGitHubReleaseDownloadUrl(platform)
+    );
   }
 
   return "";
+}
+
+function isGitHubReleaseFallbackEnabled() {
+  return String(process.env.DOWNLOAD_GITHUB_RELEASES || "1").trim() !== "0";
+}
+
+function getGitHubReleaseDownloadUrl(platform) {
+  if (!isGitHubReleaseFallbackEnabled()) {
+    return "";
+  }
+
+  const repository = String(
+    process.env.DOWNLOAD_GITHUB_REPOSITORY ||
+      process.env.GITHUB_REPOSITORY ||
+      "webobscure/Onkron-Specification-CLI"
+  ).trim();
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    return "";
+  }
+
+  const assetName = String(
+    platform === "macos"
+      ? process.env.DOWNLOAD_MACOS_ASSET_NAME ||
+          `VamShop Spec GUI-${packageJson.version}-mac.dmg`
+      : process.env.DOWNLOAD_WINDOWS_ASSET_NAME ||
+          `VamShop Spec GUI-${packageJson.version}-win.exe`
+  ).trim();
+  if (!assetName) {
+    return "";
+  }
+
+  const tag = String(process.env.DOWNLOAD_GITHUB_TAG || "latest").trim();
+  const releasePath =
+    tag && tag !== "latest"
+      ? `download/${encodeURIComponent(tag)}`
+      : "latest/download";
+
+  return `https://github.com/${repository}/releases/${releasePath}/${encodeURIComponent(assetName)}`;
 }
 
 function getDownloadFile(platform) {
@@ -302,6 +347,18 @@ function renderLandingPage() {
     "Логи операций в Bitrix24 и прогресс выполнения долгих задач.",
   ];
   const featureItems = features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("");
+  const downloadNote =
+    macAvailable || windowsAvailable
+      ? "Выберите платформу и скачайте актуальную сборку приложения."
+      : "Ссылки на сборки пока не подключены на сервере.";
+  const macIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.72 12.62c-.03-2.17 1.78-3.22 1.86-3.27-1.02-1.49-2.6-1.69-3.15-1.71-1.34-.14-2.62.79-3.3.79-.69 0-1.74-.77-2.87-.75-1.47.02-2.84.86-3.6 2.18-1.54 2.67-.39 6.62 1.09 8.79.73 1.04 1.59 2.21 2.72 2.17 1.1-.04 1.51-.7 2.84-.7 1.32 0 1.69.7 2.85.68 1.18-.02 1.92-1.06 2.64-2.11.84-1.21 1.18-2.39 1.19-2.45-.03-.01-2.24-.86-2.27-3.62ZM14.55 6.22c.6-.73 1.01-1.74.9-2.75-.87.04-1.93.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.08 1.96-.49 2.57-1.23Z"/></svg>`;
+  const windowsIcon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4.7 10.8 3.6v7.7H3V4.7Zm9.1-1.3L21 2.1v9.2h-8.9V3.4ZM3 12.7h7.8v7.7L3 19.3v-6.6Zm9.1 0H21v9.2l-8.9-1.3v-7.9Z"/></svg>`;
+  const macButton = macAvailable
+    ? `<a class="button primary" href="/download/macos"><span class="os-icon mac">${macIcon}</span><span>Скачать для macOS</span></a>`
+    : `<span class="button disabled" aria-disabled="true"><span class="os-icon mac">${macIcon}</span><span>macOS скоро будет</span></span>`;
+  const windowsButton = windowsAvailable
+    ? `<a class="button secondary" href="/download/windows"><span class="os-icon windows">${windowsIcon}</span><span>Скачать для Windows</span></a>`
+    : `<span class="button secondary disabled" aria-disabled="true"><span class="os-icon windows">${windowsIcon}</span><span>Windows скоро будет</span></span>`;
 
   return `<!doctype html>
 <html lang="ru">
@@ -314,11 +371,12 @@ function renderLandingPage() {
       --ink: #181612;
       --muted: #6f6658;
       --paper: #fbf7ee;
-      --card: rgba(255, 253, 247, 0.86);
+      --card: rgba(255, 253, 247, 0.9);
       --line: #ded6c7;
       --accent: #dd3c27;
       --accent-dark: #b82f1e;
-      --shadow: 0 24px 80px rgba(70, 54, 34, 0.18);
+      --teal: #24767c;
+      --shadow: 0 26px 90px rgba(65, 48, 28, 0.16);
     }
     * { box-sizing: border-box; }
     body {
@@ -329,26 +387,35 @@ function renderLandingPage() {
       background:
         radial-gradient(circle at 10% 10%, rgba(221, 60, 39, 0.14), transparent 28rem),
         radial-gradient(circle at 90% 5%, rgba(36, 118, 124, 0.16), transparent 24rem),
-        linear-gradient(135deg, #f4ebdc, #fffaf1 52%, #efe3d1);
+        linear-gradient(135deg, #f2e8d9, #fffaf2 54%, #eee2d0);
     }
     main {
-      width: min(1120px, calc(100% - 32px));
+      width: min(1180px, calc(100% - 32px));
+      min-height: 100vh;
       margin: 0 auto;
-      padding: 56px 0;
+      padding: 32px 0;
+      display: grid;
+      align-items: center;
     }
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-      gap: 28px;
+      grid-template-columns: minmax(0, 1.06fr) minmax(340px, 0.94fr);
+      gap: 24px;
       align-items: stretch;
     }
     .panel {
       border: 1px solid var(--line);
-      border-radius: 34px;
+      border-radius: 30px;
       background: var(--card);
       box-shadow: var(--shadow);
-      padding: clamp(28px, 4vw, 52px);
+      padding: clamp(26px, 4vw, 46px);
       backdrop-filter: blur(14px);
+    }
+    .intro {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 580px;
     }
     .eyebrow {
       display: inline-flex;
@@ -366,40 +433,61 @@ function renderLandingPage() {
       height: 12px;
       border-radius: 999px;
       background: var(--accent);
-      box-shadow: 18px 0 0 #24767c;
+      box-shadow: 18px 0 0 var(--teal);
     }
     h1 {
-      margin: 28px 0 18px;
-      max-width: 760px;
-      font-size: clamp(42px, 7vw, 84px);
-      line-height: 0.92;
-      letter-spacing: -0.07em;
+      margin: 38px 0 22px;
+      max-width: 650px;
+      font-size: clamp(48px, 6.2vw, 76px);
+      line-height: 0.94;
+      letter-spacing: -0.065em;
     }
     p {
       margin: 0;
       color: var(--muted);
-      font-size: clamp(18px, 2vw, 23px);
+      max-width: 610px;
+      font-size: clamp(18px, 2vw, 22px);
       line-height: 1.45;
     }
     .actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 14px;
-      margin-top: 34px;
+      gap: 12px;
+      margin-top: 42px;
     }
     .button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 58px;
-      padding: 0 24px;
-      border-radius: 18px;
+      gap: 10px;
+      min-height: 54px;
+      min-width: 190px;
+      padding: 0 22px;
+      border-radius: 16px;
       color: #fff;
       background: linear-gradient(135deg, var(--accent), var(--accent-dark));
       text-decoration: none;
       font-weight: 900;
-      font-size: 17px;
-      box-shadow: 0 14px 30px rgba(221, 60, 39, 0.28);
+      font-size: 16px;
+      box-shadow: 0 16px 34px rgba(221, 60, 39, 0.27);
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+    .os-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 23px;
+      height: 23px;
+      flex: 0 0 auto;
+    }
+    .os-icon svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      fill: currentColor;
+    }
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 42px rgba(221, 60, 39, 0.32);
     }
     .button.secondary {
       color: var(--ink);
@@ -409,24 +497,37 @@ function renderLandingPage() {
     }
     .button.disabled {
       pointer-events: none;
-      opacity: 0.48;
-      filter: grayscale(1);
+      color: #9a9388;
+      background: #ebe7df;
+      border: 1px solid #d8d0c2;
+      box-shadow: none;
+      filter: none;
+    }
+    .features-panel {
+      display: grid;
+      align-content: center;
+    }
+    .features-title {
+      margin: 0 0 18px;
+      font-size: clamp(28px, 3vw, 38px);
+      line-height: 1;
+      letter-spacing: -0.045em;
     }
     .features {
       display: grid;
-      gap: 14px;
+      gap: 12px;
       margin: 0;
       padding: 0;
       list-style: none;
     }
     .features li {
       position: relative;
-      padding: 18px 18px 18px 48px;
+      padding: 17px 18px 17px 46px;
       border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255, 255, 255, 0.54);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.62);
       color: #40392f;
-      font-size: 17px;
+      font-size: 16px;
       line-height: 1.35;
       font-weight: 700;
     }
@@ -438,18 +539,39 @@ function renderLandingPage() {
       width: 13px;
       height: 13px;
       border-radius: 50%;
-      background: #24767c;
+      background: var(--teal);
     }
     .note {
       margin-top: 18px;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.5);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .status::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: ${macAvailable || windowsAvailable ? "var(--teal)" : "#b7afa2"};
     }
     @media (max-width: 860px) {
       main { padding: 22px 0; }
       .hero { grid-template-columns: 1fr; }
       .panel { border-radius: 26px; }
+      .intro { min-height: auto; }
       .button { width: 100%; }
     }
   </style>
@@ -457,17 +579,22 @@ function renderLandingPage() {
 <body>
   <main>
     <section class="hero">
-      <div class="panel">
-        <div class="eyebrow">ONKRON internal tool</div>
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(subtitle)}</p>
-        <div class="actions">
-          <a class="button${macAvailable ? "" : " disabled"}" href="/download/macos">Скачать для macOS</a>
-          <a class="button secondary${windowsAvailable ? "" : " disabled"}" href="/download/windows">Скачать для Windows</a>
+      <div class="panel intro">
+        <div>
+          <div class="eyebrow">ONKRON internal tool</div>
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(subtitle)}</p>
         </div>
-        <div class="note">Если кнопка неактивна, файл сборки еще не подключен на сервере.</div>
+        <div>
+          <div class="actions">
+            ${macButton}
+            ${windowsButton}
+          </div>
+          <div class="status">${escapeHtml(downloadNote)}</div>
+        </div>
       </div>
-      <div class="panel">
+      <div class="panel features-panel">
+        <h2 class="features-title">Что умеет приложение</h2>
         <ul class="features">${featureItems}</ul>
       </div>
     </section>

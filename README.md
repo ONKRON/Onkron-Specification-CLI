@@ -217,6 +217,17 @@ DOWNLOAD_MACOS_URL=https://example.com/VamShop-Spec-GUI-mac.dmg
 DOWNLOAD_WINDOWS_URL=https://example.com/VamShop-Spec-GUI-win.exe
 ```
 
+If these variables are not set, the API automatically uses GitHub Releases:
+
+```env
+DOWNLOAD_GITHUB_REPOSITORY=webobscure/Onkron-Specification-CLI
+DOWNLOAD_GITHUB_TAG=latest
+DOWNLOAD_MACOS_ASSET_NAME=VamShop Spec GUI-1.0.0-mac.dmg
+DOWNLOAD_WINDOWS_ASSET_NAME=VamShop Spec GUI-1.0.0-win.exe
+```
+
+Set `DOWNLOAD_GITHUB_RELEASES=0` to disable this fallback.
+
 Or serve files from the server filesystem:
 
 ```env
