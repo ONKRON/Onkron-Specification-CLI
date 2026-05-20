@@ -310,6 +310,8 @@ npm run pack
 npm run dist:mac
 npm run dist:mac:unsigned
 npm run dist:win
+npm run dist:win:x64
+npm run dist:win:arm64
 npm run dist:linux
 npm run dist:all
 npm run spec:material
@@ -332,8 +334,12 @@ npm run dist:mac
 # macOS DMG без подписи
 npm run dist:mac:unsigned
 
-# Windows installer (.exe / nsis)
+# Windows installer (.exe / nsis, x64 по умолчанию)
 npm run dist:win
+
+# Явные Windows-сборки
+npm run dist:win:x64
+npm run dist:win:arm64
 
 # Linux AppImage
 npm run dist:linux
