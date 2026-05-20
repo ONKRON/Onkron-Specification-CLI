@@ -1308,6 +1308,7 @@ async function submitTransferSelection() {
     }
 
     appendOutput(`Завершено: ${new Date().toLocaleString()}`);
+    closeTransferSpecsModal();
   } catch (error) {
     outputEl.classList.add("error");
     appendOutput(`ОШИБКА: ${error.message}`, true);
@@ -1379,6 +1380,7 @@ async function saveEditorSpecifications() {
       skipStoreDraft: true,
     });
     appendOutput(`Завершено: ${new Date().toLocaleString()}`);
+    closeEditorModal();
   } catch (error) {
     outputEl.classList.add("error");
     appendOutput(`ОШИБКА: ${error.message}`, true);
