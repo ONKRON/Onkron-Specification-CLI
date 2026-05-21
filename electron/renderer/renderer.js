@@ -70,7 +70,6 @@ let transferSpecEntries = [];
 let selectedTransferSpecIds = new Set();
 let transferSpecsSearchQuery = "";
 let transferProductsCache = [];
-let transferSearchDebounceTimer = null;
 let selectedProductActionMode = null;
 let editorEntries = [];
 let editorInitialEntries = [];
@@ -397,8 +396,13 @@ function updateEditorDirtySummary() {
   storeCurrentEditorDraft();
   const changedCount = getChangedEditorEntries().length;
   const draftCounts = countEditorDraftChanges();
+  if (draftCounts.itemCount === 0) {
+    editorDirtySummaryEl.textContent = "Изменено пунктов: 0";
+    return;
+  }
+
   editorDirtySummaryEl.textContent =
-    `Текущий язык: ${changedCount} · Всего: ${draftCounts.itemCount} ` +
+    `Изменено в текущем языке: ${changedCount} · Всего изменений: ${draftCounts.itemCount} ` +
     `в ${draftCounts.languageCount} языках`;
 }
 
@@ -1092,11 +1096,6 @@ function formatTransferStats(stats) {
 }
 
 async function loadTransferProducts() {
-  if (transferSearchDebounceTimer !== null) {
-    clearTimeout(transferSearchDebounceTimer);
-    transferSearchDebounceTimer = null;
-  }
-
   const payload = {
     sourceLanguageId: Number(sourceLanguageIdEl.value || 1),
     search: transferSearchEl.value.trim(),
@@ -1131,21 +1130,6 @@ async function loadTransferProducts() {
   closeEditorModal();
   updateTransferSelectionSummary();
   refreshActionButtons();
-}
-
-function scheduleTransferSearch() {
-  if (transferSearchDebounceTimer !== null) {
-    clearTimeout(transferSearchDebounceTimer);
-    transferSearchDebounceTimer = null;
-  }
-
-  transferSearchDebounceTimer = setTimeout(() => {
-    transferSearchDebounceTimer = null;
-    loadTransferProducts().catch((error) => {
-      outputEl.classList.add("error");
-      appendOutput(`ОШИБКА: ${error.message}`, true);
-    });
-  }, 320);
 }
 
 async function selectTransferProduct(productId) {
@@ -1510,12 +1494,11 @@ function bindEvents() {
     });
   });
 
-  transferSearchEl.addEventListener("input", () => {
-    const query = transferSearchEl.value.trim();
-    if (query.length === 1 && Number.isNaN(Number(query))) {
-      return;
-    }
-    scheduleTransferSearch();
+  transferSearchEl.addEventListener("change", () => {
+    loadTransferProducts().catch((error) => {
+      outputEl.classList.add("error");
+      appendOutput(`ОШИБКА: ${error.message}`, true);
+    });
   });
 
   transferSpecsSearchEl.addEventListener("input", () => {
