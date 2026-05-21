@@ -687,7 +687,7 @@ function renderLandingPage() {
         </div>
         <div>
           <div class="actions">
-            <a class="button secondary" href="/app"><span>Открыть веб-версию</span></a>
+            <a class="button secondary" href="/app/"><span>Открыть веб-версию</span></a>
             ${macButton}
             ${windowsButton}
           </div>
