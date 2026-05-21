@@ -3,25 +3,12 @@
     return;
   }
 
-  const TOKEN_STORAGE_KEY = "vamshop_spec_api_token";
   const progressPlanHandlers = new Set();
   const progressHandlers = new Set();
-  let token = window.localStorage.getItem(TOKEN_STORAGE_KEY) || "";
-
-  function setToken(nextToken) {
-    token = String(nextToken || "").trim();
-    if (token) {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      return;
-    }
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-  }
+  window.localStorage.removeItem("vamshop_spec_api_token");
 
   function getHeaders(extra = {}) {
-    return {
-      ...extra,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+    return extra;
   }
 
   async function readError(response) {
@@ -33,10 +20,15 @@
     }
   }
 
-  async function requestJson(pathname, { method = "GET", body = null } = {}) {
+  async function requestJson(
+    pathname,
+    { method = "GET", body = null, headers = {} } = {},
+  ) {
     const response = await fetch(pathname, {
       method,
+      credentials: "same-origin",
       headers: getHeaders({
+        ...headers,
         ...(body !== null ? { "Content-Type": "application/json" } : {}),
       }),
       body: body !== null ? JSON.stringify(body) : undefined,
@@ -52,6 +44,7 @@
   async function requestNdjson(pathname, body) {
     const response = await fetch(pathname, {
       method: "POST",
+      credentials: "same-origin",
       headers: getHeaders({
         "Content-Type": "application/json",
         Accept: "application/x-ndjson",
@@ -122,27 +115,21 @@
   window.specApi = {
     getAuthConfig: () => requestJson("/auth/config"),
     getAuthSession: async () => {
-      if (!token) {
-        return { required: true, authenticated: false, user: null };
-      }
-
       try {
         return await requestJson("/auth/session");
       } catch (error) {
-        setToken("");
         return { required: true, authenticated: false, user: null };
       }
     },
     login: async (payload) => {
       const session = await requestJson("/auth/login", {
         method: "POST",
+        headers: { "X-Use-Cookie-Auth": "1" },
         body: payload || {},
       });
-      setToken(session?.token || "");
       return session;
     },
     logout: async () => {
-      setToken("");
       try {
         return await requestJson("/auth/logout", {
           method: "POST",

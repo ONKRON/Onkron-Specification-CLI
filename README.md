@@ -48,6 +48,8 @@ AUTH_DB_SSL=0
 AUTH_DB_SSL_REJECT_UNAUTHORIZED=1
 AUTH_MAX_FAILED_ATTEMPTS=5
 AUTH_LOCKOUT_MS=300000
+AUDIT_TABLE=audit_logs
+AUDIT_LOG_ENABLED=1
 TRANSFER_SOURCE_LANGUAGE_ID=1
 
 # optional Bitrix logging
@@ -206,6 +208,24 @@ RATE_LIMIT_HEAVY_WINDOW_MS=3600000
 ```
 
 The Railway server also sends security headers for API, web app, landing and download responses: CSP, `X-Frame-Options: DENY`, `nosniff`, `no-referrer` and a restrictive permissions policy.
+
+Web authentication uses an `HttpOnly` session cookie, so the browser version does not store the API token in `localStorage`. Desktop API mode still uses the Bearer token returned by `/auth/login`.
+
+Audit logging writes to the auth database by default. Expected table shape:
+
+```sql
+CREATE TABLE audit_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(191) NOT NULL,
+  role VARCHAR(32) NOT NULL,
+  action VARCHAR(191) NOT NULL,
+  product_id INT NULL,
+  specification_ids TEXT NULL,
+  ip VARCHAR(64) NULL,
+  user_agent TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 Health check:
 

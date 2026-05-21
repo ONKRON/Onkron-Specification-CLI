@@ -15,8 +15,17 @@ const {
 } = require("../dist/lib/transfer");
 const { sendBitrixChangeLog } = require("../dist/lib/bitrixLogger");
 const { isAuthRequired, authenticate } = require("../electron/auth");
+const { auditLog } = require("./auditLogger");
 
 const ALL_TARGETS = "all";
+const configuredSessionCookieName = String(
+  process.env.API_SESSION_COOKIE_NAME || "",
+).trim();
+const SESSION_COOKIE_NAME = /^[A-Za-z0-9_-]+$/.test(
+  configuredSessionCookieName,
+)
+  ? configuredSessionCookieName
+  : "vamshop_spec_session";
 const TRANSFER_SOURCE_LANGUAGE_ID = Number(
   process.env.TRANSFER_SOURCE_LANGUAGE_ID || 1,
 );
@@ -193,12 +202,96 @@ function getBearerToken(req) {
   return match ? match[1].trim() : "";
 }
 
+function parseCookies(req) {
+  return String(req.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((cookies, part) => {
+      const separatorIndex = part.indexOf("=");
+      if (separatorIndex < 0) {
+        return cookies;
+      }
+
+      const key = part.slice(0, separatorIndex).trim();
+      const value = part.slice(separatorIndex + 1).trim();
+      if (key) {
+        try {
+          cookies[key] = decodeURIComponent(value);
+        } catch (_error) {
+          cookies[key] = value;
+        }
+      }
+      return cookies;
+    }, {});
+}
+
+function getCookieToken(req) {
+  return parseCookies(req)[SESSION_COOKIE_NAME] || "";
+}
+
+function getRequestToken(req) {
+  return getBearerToken(req) || getCookieToken(req);
+}
+
+function isSecureRequest(req) {
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  return (
+    forwardedProto === "https" ||
+    Boolean(req.socket?.encrypted) ||
+    Boolean(process.env.RAILWAY_ENVIRONMENT)
+  );
+}
+
+function shouldUseCookieAuth(req) {
+  return String(req.headers["x-use-cookie-auth"] || "").trim() === "1";
+}
+
+function getSessionCookieHeader(req, token) {
+  const parts = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    `Max-Age=${TOKEN_TTL_SECONDS}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (isSecureRequest(req)) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+
+function getClearSessionCookieHeader(req) {
+  const parts = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "Max-Age=0",
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (isSecureRequest(req)) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+
+function buildLoginResponse(req, user, token) {
+  const payload = createSessionState(user);
+  if (!shouldUseCookieAuth(req)) {
+    payload.token = token;
+  }
+  return payload;
+}
+
 function getRequestUser(req) {
   if (!isAuthRequired()) {
     return { id: 0, username: "локально", role: "admin" };
   }
 
-  const user = verifyToken(getBearerToken(req));
+  const user = verifyToken(getRequestToken(req));
   if (!user) {
     const error = new Error("Требуется авторизация");
     error.statusCode = 401;
@@ -1070,14 +1163,37 @@ async function handleRoute(req, res) {
       credentials?.username || "anonymous",
       RATE_LIMITS.login,
     );
-    const user = await authenticate(credentials);
+    let user;
+    try {
+      user = await authenticate(credentials);
+    } catch (error) {
+      auditLog({
+        req,
+        username: credentials?.username,
+        role: "unknown",
+        action: "auth.login.failed",
+      });
+      throw error;
+    }
     const token = createToken(user);
-    sendJson(res, 200, { ...createSessionState(user), token });
+    auditLog({ req, user, action: "auth.login.success" });
+    sendJson(res, 200, buildLoginResponse(req, user, token), {
+      "Set-Cookie": getSessionCookieHeader(req, token),
+    });
     return;
   }
 
   if (method === "POST" && pathname === "/auth/logout") {
-    sendJson(res, 200, createSessionState(null));
+    let user = null;
+    try {
+      user = getRequestUser(req);
+    } catch (_error) {
+      user = null;
+    }
+    auditLog({ req, user, action: "auth.logout" });
+    sendJson(res, 200, createSessionState(null), {
+      "Set-Cookie": getClearSessionCookieHeader(req),
+    });
     return;
   }
 
@@ -1102,6 +1218,12 @@ async function handleRoute(req, res) {
             writeNdjson(res, "progress-plan", payload),
           onProgress: (payload) => writeNdjson(res, "progress", payload),
         });
+        auditLog({
+          req,
+          user,
+          action: "task.run",
+          specIds: result?.tasks?.flatMap((task) => task?.specificationId || []),
+        });
         writeNdjson(res, "result", result);
       } catch (error) {
         writeNdjson(res, "error", {
@@ -1112,7 +1234,14 @@ async function handleRoute(req, res) {
       return;
     }
 
-    sendJson(res, 200, await runTaskAction(body, user));
+    const result = await runTaskAction(body, user);
+    auditLog({
+      req,
+      user,
+      action: "task.run",
+      specIds: result?.tasks?.flatMap((task) => task?.specificationId || []),
+    });
+    sendJson(res, 200, result);
     return;
   }
 
@@ -1191,6 +1320,13 @@ async function handleRoute(req, res) {
     });
 
     sendJson(res, 200, result);
+    auditLog({
+      req,
+      user,
+      action: "editor.save-product-specs",
+      productId: result.productId,
+      specIds: result.specIds,
+    });
     return;
   }
 
@@ -1203,6 +1339,13 @@ async function handleRoute(req, res) {
         const result = await transferSubmitAction(body, user, {
           onProgress: (payload) => writeNdjson(res, "progress", payload),
         });
+        auditLog({
+          req,
+          user,
+          action: "transfer.submit",
+          productId: result.productId,
+          specIds: result.specIds,
+        });
         writeNdjson(res, "result", result);
       } catch (error) {
         writeNdjson(res, "error", {
@@ -1213,7 +1356,15 @@ async function handleRoute(req, res) {
       return;
     }
 
-    sendJson(res, 200, await transferSubmitAction(body, user));
+    const result = await transferSubmitAction(body, user);
+    sendJson(res, 200, result);
+    auditLog({
+      req,
+      user,
+      action: "transfer.submit",
+      productId: result.productId,
+      specIds: result.specIds,
+    });
     return;
   }
 

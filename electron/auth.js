@@ -244,4 +244,5 @@ async function authenticate(credentials) {
 module.exports = {
   isAuthRequired,
   authenticate,
+  getAuthDbConfig,
 };
