@@ -33,6 +33,56 @@ const RELEASE_DIR = path.resolve(
 );
 const WEB_APP_DIR = path.join(__dirname, "..", "electron", "renderer");
 const ICONS_DIR = path.join(__dirname, "..", "build", "icons");
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https://shop.onkron.ru data:",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; "),
+};
+const RATE_LIMITS = {
+  login: {
+    windowMs: parsePositiveInteger(
+      process.env.RATE_LIMIT_LOGIN_WINDOW_MS,
+      15 * 60 * 1000,
+    ),
+    max: parsePositiveInteger(process.env.RATE_LIMIT_LOGIN_MAX, 10),
+  },
+  api: {
+    windowMs: parsePositiveInteger(process.env.RATE_LIMIT_API_WINDOW_MS, 60_000),
+    max: parsePositiveInteger(process.env.RATE_LIMIT_API_MAX, 240),
+  },
+  search: {
+    windowMs: parsePositiveInteger(
+      process.env.RATE_LIMIT_SEARCH_WINDOW_MS,
+      60_000,
+    ),
+    max: parsePositiveInteger(process.env.RATE_LIMIT_SEARCH_MAX, 80),
+  },
+  heavy: {
+    windowMs: parsePositiveInteger(
+      process.env.RATE_LIMIT_HEAVY_WINDOW_MS,
+      60 * 60 * 1000,
+    ),
+    max: parsePositiveInteger(process.env.RATE_LIMIT_HEAVY_MAX, 80),
+  },
+};
+const rateLimitBuckets = new Map();
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function normalizeLanguageInput(value, fallback, { allowAll = false } = {}) {
   if (value === undefined || value === null || value === "") {
@@ -190,19 +240,96 @@ async function readJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-function sendJson(res, statusCode, payload) {
+function withSecurityHeaders(headers = {}) {
+  return {
+    ...SECURITY_HEADERS,
+    ...headers,
+  };
+}
+
+function getClientIp(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
+    .split(",")[0]
+    .trim();
+  return (
+    String(req.headers["cf-connecting-ip"] || "").trim() ||
+    String(req.headers["x-real-ip"] || "").trim() ||
+    forwardedFor ||
+    String(req.socket?.remoteAddress || "unknown")
+  );
+}
+
+function normalizeRateLimitPart(value) {
+  return String(value || "anonymous")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.@:-]/g, "_")
+    .slice(0, 80);
+}
+
+function cleanupRateLimitBuckets(now) {
+  if (rateLimitBuckets.size < 5000) {
+    return;
+  }
+
+  for (const [key, bucket] of rateLimitBuckets.entries()) {
+    if (!bucket || bucket.resetAt <= now) {
+      rateLimitBuckets.delete(key);
+    }
+  }
+}
+
+function checkRateLimit(req, scope, identifier, config) {
+  const now = Date.now();
+  cleanupRateLimitBuckets(now);
+
+  const key = [
+    scope,
+    normalizeRateLimitPart(getClientIp(req)),
+    normalizeRateLimitPart(identifier),
+  ].join(":");
+  const existing = rateLimitBuckets.get(key);
+  const bucket =
+    existing && existing.resetAt > now
+      ? existing
+      : { count: 0, resetAt: now + config.windowMs };
+
+  bucket.count += 1;
+  rateLimitBuckets.set(key, bucket);
+
+  if (bucket.count <= config.max) {
+    return;
+  }
+
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((bucket.resetAt - now) / 1000),
+  );
+  const error = new Error(
+    `Слишком много запросов. Повторите через ${retryAfterSeconds} сек.`,
+  );
+  error.statusCode = 429;
+  error.retryAfterSeconds = retryAfterSeconds;
+  throw error;
+}
+
+function sendJson(res, statusCode, payload, headers = {}) {
   res.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
+    ...withSecurityHeaders({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    }),
+    ...headers,
   });
   res.end(JSON.stringify(payload));
 }
 
 function sendHtml(res, statusCode, html) {
   res.writeHead(statusCode, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "public, max-age=300",
-    "X-Content-Type-Options": "nosniff",
+    ...withSecurityHeaders({
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+    }),
   });
   res.end(html);
 }
@@ -220,10 +347,11 @@ function sendFile(
 
   const stat = fs.statSync(filePath);
   res.writeHead(200, {
-    "Content-Type": contentType,
-    "Content-Length": stat.size,
-    "Cache-Control": cache,
-    "X-Content-Type-Options": "nosniff",
+    ...withSecurityHeaders({
+      "Content-Type": contentType,
+      "Content-Length": stat.size,
+      "Cache-Control": cache,
+    }),
   });
   fs.createReadStream(filePath).pipe(res);
 }
@@ -243,9 +371,17 @@ function escapeAttribute(value) {
 
 function sendError(res, error) {
   const statusCode = Number(error?.statusCode) || 500;
-  sendJson(res, statusCode, {
-    error: error?.message || "Внутренняя ошибка сервера",
-  });
+  const headers = error?.retryAfterSeconds
+    ? { "Retry-After": String(error.retryAfterSeconds) }
+    : {};
+  sendJson(
+    res,
+    statusCode,
+    {
+      error: error?.message || "Внутренняя ошибка сервера",
+    },
+    headers,
+  );
 }
 
 function wantsNdjson(req) {
@@ -258,9 +394,11 @@ function writeNdjson(res, type, payload) {
 
 function initNdjson(res) {
   res.writeHead(200, {
-    "Content-Type": "application/x-ndjson; charset=utf-8",
-    "Cache-Control": "no-store",
-    "X-Accel-Buffering": "no",
+    ...withSecurityHeaders({
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Accel-Buffering": "no",
+    }),
   });
 }
 
@@ -725,8 +863,10 @@ function handleDownload(res, platform) {
   const url = getDownloadUrl(platform);
   if (url) {
     res.writeHead(302, {
-      Location: url,
-      "Cache-Control": "no-store",
+      ...withSecurityHeaders({
+        Location: url,
+        "Cache-Control": "no-store",
+      }),
     });
     res.end();
     return;
@@ -745,11 +885,12 @@ function handleDownload(res, platform) {
   const fileName = path.basename(filePath);
   const stat = fs.statSync(filePath);
   res.writeHead(200, {
-    "Content-Type": getContentType(filePath),
-    "Content-Length": stat.size,
-    "Content-Disposition": `attachment; filename="${escapeAttribute(fileName)}"`,
-    "Cache-Control": "private, max-age=60",
-    "X-Content-Type-Options": "nosniff",
+    ...withSecurityHeaders({
+      "Content-Type": getContentType(filePath),
+      "Content-Length": stat.size,
+      "Content-Disposition": `attachment; filename="${escapeAttribute(fileName)}"`,
+      "Cache-Control": "private, max-age=60",
+    }),
   });
   fs.createReadStream(filePath).pipe(res);
 }
@@ -883,8 +1024,10 @@ async function handleRoute(req, res) {
 
   if (method === "GET" && rawPathname === "/app") {
     res.writeHead(302, {
-      Location: "/app/",
-      "Cache-Control": "no-store",
+      ...withSecurityHeaders({
+        Location: "/app/",
+        "Cache-Control": "no-store",
+      }),
     });
     res.end();
     return;
@@ -921,6 +1064,12 @@ async function handleRoute(req, res) {
 
   if (method === "POST" && pathname === "/auth/login") {
     const credentials = await readJsonBody(req);
+    checkRateLimit(
+      req,
+      "auth-login",
+      credentials?.username || "anonymous",
+      RATE_LIMITS.login,
+    );
     const user = await authenticate(credentials);
     const token = createToken(user);
     sendJson(res, 200, { ...createSessionState(user), token });
@@ -939,8 +1088,11 @@ async function handleRoute(req, res) {
   }
 
   const user = getRequestUser(req);
+  const userRateLimitId = user?.id || user?.username || "anonymous";
+  checkRateLimit(req, "api", userRateLimitId, RATE_LIMITS.api);
 
   if (method === "POST" && pathname === "/tasks/run") {
+    checkRateLimit(req, "heavy-task", userRateLimitId, RATE_LIMITS.heavy);
     const body = await readJsonBody(req);
     if (wantsNdjson(req)) {
       initNdjson(res);
@@ -965,6 +1117,7 @@ async function handleRoute(req, res) {
   }
 
   if (method === "POST" && pathname === "/transfer/products") {
+    checkRateLimit(req, "search-products", userRateLimitId, RATE_LIMITS.search);
     const body = await readJsonBody(req);
     sendJson(
       res,
@@ -1015,6 +1168,7 @@ async function handleRoute(req, res) {
   }
 
   if (method === "POST" && pathname === "/editor/save-product-specs") {
+    checkRateLimit(req, "heavy-editor", userRateLimitId, RATE_LIMITS.heavy);
     const body = await readJsonBody(req);
     const productId = validateProductId(body?.productId);
     const languageId = validateLanguageId(body?.languageId);
@@ -1041,6 +1195,7 @@ async function handleRoute(req, res) {
   }
 
   if (method === "POST" && pathname === "/transfer/submit") {
+    checkRateLimit(req, "heavy-transfer", userRateLimitId, RATE_LIMITS.heavy);
     const body = await readJsonBody(req);
     if (wantsNdjson(req)) {
       initNdjson(res);

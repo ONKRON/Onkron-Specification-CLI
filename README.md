@@ -192,6 +192,21 @@ BITRIX_DIALOG_ID=chat101362
 
 Also keep the needed `SPEC_*` and conversion variables on Railway if you override defaults.
 
+Optional API protection tuning:
+
+```env
+RATE_LIMIT_LOGIN_MAX=10
+RATE_LIMIT_LOGIN_WINDOW_MS=900000
+RATE_LIMIT_API_MAX=240
+RATE_LIMIT_API_WINDOW_MS=60000
+RATE_LIMIT_SEARCH_MAX=80
+RATE_LIMIT_SEARCH_WINDOW_MS=60000
+RATE_LIMIT_HEAVY_MAX=80
+RATE_LIMIT_HEAVY_WINDOW_MS=3600000
+```
+
+The Railway server also sends security headers for API, web app, landing and download responses: CSP, `X-Frame-Options: DENY`, `nosniff`, `no-referrer` and a restrictive permissions policy.
+
 Health check:
 
 ```bash
